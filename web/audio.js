@@ -1,6 +1,8 @@
 // Music bed, clip audio routing, ducking, onset detection and a procedural ambient generator
 // so the stream never runs silent even with an empty music folder.
 
+import { WashGenerator } from './wash.js';
+
 const midiToFreq = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const SCALES = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11] };
 
@@ -320,9 +322,14 @@ export class AudioEngine {
 
   startGenerated(params, rng) {
     this.stopMusic();
-    this.gen = new AmbientGenerator(this, params, rng);
+    this.gen = (params.style || 'wash') === 'wash' ? new WashGenerator(this, params, rng) : new AmbientGenerator(this, params, rng);
     this.gen.start();
     this.mode = 'generated';
+  }
+
+  // The edit tells the music what is on screen; generators that can follow, do.
+  setScene(phrase, cue) {
+    if (this.gen && typeof this.gen.setScene === 'function') this.gen.setScene(phrase, cue);
   }
 
   onOnset(fn) { this.onsetHandlers.push(fn); }

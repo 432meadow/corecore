@@ -306,6 +306,7 @@ export class Player {
       if (next.fx.hold) next.holdAt = now + next.dur * 0.8;
     }
     this.audio.duck(next.audio?.duck ?? 1);
+    this.audio.setScene(next.phrase, next);
     if (next.fx?.flash?.at === 'start') this.flash(next.fx.flash.strength);
     if (prev?.fx?.flash?.at === 'end') this.flash(prev.fx.flash.strength);
     if (this.previous?.slot) { this.release(this.previous.slot); this.previous.slot = null; this.previous = null; }

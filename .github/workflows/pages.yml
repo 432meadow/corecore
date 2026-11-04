@@ -12,7 +12,7 @@ on:
         default: "2400"
       max_mb:
         description: size budget of the exported site in MB
-        default: "450"
+        default: "600"
       seed_set:
         description: "which starter set to scrape: contemporary (mirrored web video), archival (public domain), all"
         default: "contemporary"
@@ -74,7 +74,7 @@ jobs:
           TAGS=""; if [ "$SET" = "contemporary" ]; then TAGS="--tags modern"; fi
           python -m corecore build-site --out site --set "$SET" $TAGS \
             --time-budget "${{ github.event.inputs.time_budget || '2400' }}" \
-            --max-mb "${{ github.event.inputs.max_mb || '450' }}"
+            --max-mb "${{ github.event.inputs.max_mb || '600' }}"
           python -m corecore stats
           du -sh site
 

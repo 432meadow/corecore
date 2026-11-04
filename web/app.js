@@ -68,8 +68,8 @@ function fillModes() {
 
 async function fillMusic() {
   const sel = $('#music');
-  sel.innerHTML = '<option value="generated">generated (mode default)</option>'
-    + '<option value="ambient">generated ambient pad</option><option value="piano">generated piano</option>';
+  sel.innerHTML = '<option value="generated">generated (mode default: the wash)</option>'
+    + '<option value="wash">generated wash</option><option value="ambient">generated pad (old)</option><option value="piano">generated piano</option>';
   try {
     let tracks = [];
     if (STATIC) {
@@ -92,9 +92,9 @@ async function fillMusic() {
 
 async function applyMusic() {
   if (!state.started) return;
-  if (['generated', 'ambient', 'piano'].includes(state.music)) {
+  if (['generated', 'wash', 'ambient', 'piano'].includes(state.music)) {
     const base = MODES[state.mode].music;
-    const style = state.music === 'generated' ? (base.style || 'pad') : state.music === 'piano' ? 'piano' : 'pad';
+    const style = state.music === 'generated' ? (base.style || 'wash') : state.music === 'ambient' ? 'pad' : state.music;
     audio.startGenerated(Object.assign({}, base, { style }), makeRng(`${state.seed}:music`));
   } else {
     try {
@@ -113,7 +113,7 @@ function setMode(name) {
   $('#modeBlurb').textContent = MODES[name].blurb;
   if (state.started) {
     player.flush();
-    if (['generated', 'ambient', 'piano'].includes(state.music)) applyMusic();
+    if (['generated', 'wash', 'ambient', 'piano'].includes(state.music)) applyMusic();
   }
   syncUrl();
   toast(`mode: ${MODES[name].label}`);
@@ -128,7 +128,7 @@ function setSeed(seed, { live = false } = {}) {
   player.snapEnabled = !live;
   if (state.started) {
     player.restart(live ? liveElapsed() : 0);
-    if (['generated', 'ambient', 'piano'].includes(state.music)) applyMusic();
+    if (['generated', 'wash', 'ambient', 'piano'].includes(state.music)) applyMusic();
   }
   syncUrl();
   toast(live ? 'live channel: everyone sees this edit right now' : `seed: ${seed}`);
