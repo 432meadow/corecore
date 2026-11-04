@@ -25,6 +25,7 @@ export const CONTRAST_PAIRS = [
   ['nature', 'city'], ['nature', 'screens'], ['nature', 'industry'], ['faces', 'crowd'], ['childhood', 'work'],
   ['space', 'city'], ['archive', 'modern'], ['ads', 'war'], ['ocean', 'traffic'], ['animals', 'machines'],
   ['home', 'industry'], ['earth', 'screens'], ['news', 'nature'], ['cctv', 'nature'], ['consumerism', 'nature'],
+  ['ads', 'faces'], ['consumerism', 'earth'], ['fear', 'home'], ['childhood', 'screens'],
   ['bright', 'dark'], ['still', 'motion'], ['vivid', 'muted'],
 ];
 
