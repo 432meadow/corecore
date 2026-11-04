@@ -68,6 +68,8 @@ export class Player {
     this.snapEnabled = true;
     this.waitingSince = null;
     this.scratch = {};
+    this.origin = null;      // live channel: audio-clock time of stream time zero
+    this.streamTime = 0;     // scheduled stream time of the next cue appended to the queue
     this.setAspect('16:9');
   }
 
@@ -159,6 +161,9 @@ export class Player {
   // Walk the deterministic cue stream without showing it, so a viewer joining a live channel lands
   // on the same cue everyone else is watching. The straddling cue is trimmed to the remaining time.
   async fastForward(seconds) {
+    // stream time zero is pinned to the wall clock here, so whatever this viewer's preload latency,
+    // late cues get shortened and everyone converges on the same cut at the same moment
+    this.origin = this.audio.now() - seconds;
     let t = 0;
     let guard = 0;
     while (t < seconds && guard++ < 600) {
@@ -166,19 +171,20 @@ export class Player {
       try { cues = await this.sequencer.nextPhrase(); } catch (err) { break; }
       if (!cues.length) continue;
       for (const c of cues) {
-        if (t >= seconds) { this.queue.push(c); continue; }
+        if (t >= seconds) { c.at = t; t += c.dur; this.queue.push(c); continue; }
         if (t + c.dur > seconds) {
           const into = seconds - t;
           if (c.kind === 'clip') c.offset += into * c.speed;
           c.dur -= into;
           t = seconds;
-          if (c.dur >= 0.15) this.queue.push(c);
+          if (c.dur >= 0.15) { c.at = t; t += c.dur; this.queue.push(c); }
         } else {
           t += c.dur;
         }
       }
     }
-    this.stats.skipped = Math.round(t);
+    this.streamTime = t;
+    this.stats.skipped = Math.round(seconds);
   }
 
   stop() {
@@ -193,6 +199,7 @@ export class Player {
       while (this.queue.length < QUEUE_MIN && guard++ < 8) {
         let cues = [];
         try { cues = await this.sequencer.nextPhrase(); } catch (err) { this.emit('warn', `sequencer: ${err.message}`); }
+        for (const c of cues) { c.at = this.streamTime; this.streamTime += c.dur; }
         if (cues.length) this.queue.push(...cues);
       }
       if (!this.queue.length) {
@@ -279,10 +286,18 @@ export class Player {
       else this.current = { kind: 'black', start: now, end: now + 0.05, dur: 0.05, audio: { duck: 1 }, fx: {}, phrase: 'wait' };
       return;
     }
+    if (this.origin != null && next.at != null) {
+      const sched = this.origin + next.at;
+      if (sched + next.dur <= now + 0.08) {   // entirely in the past: the broadcast moved on
+        if (next.slot) { this.release(next.slot); next.slot = null; }
+        next.dropped = true;
+        return this.advance();
+      }
+    }
     this.waitingSince = null;
     const prev = this.current;
     next.start = now;
-    next.end = now + next.dur;
+    next.end = this.origin != null && next.at != null ? Math.max(now + 0.1, this.origin + next.at + next.dur) : now + next.dur;
     if (next.kind === 'clip') {
       const el = next.slot.el;
       this.audio.setClipGain(el, next.audio.clip || 0);
@@ -595,7 +610,7 @@ export class Player {
       c?.clip ? `clip #${c.clip.id}  ${c.clip.source_title || ''}  (${c.clip.provider || ''})` : 'no clip',
       c?.clip ? `tags ${c.clip.tags.join(' ')}` : '',
       c?.clip ? `b ${c.clip.brightness ?? '-'} s ${c.clip.saturation ?? '-'} m ${c.clip.motion ?? '-'}` : '',
-      `queue ${this.queue.length}  pool ${this.catalog.size}  cues ${this.stats.cues}  snaps ${this.stats.snaps}  fails ${this.stats.failures}`,
+      `queue ${this.queue.length}  pool ${this.catalog.size}  cues ${this.stats.cues}  snaps ${this.stats.snaps}  fails ${this.stats.failures}` + (this.origin != null && c?.at != null ? `  drift ${(this.audio.now() - this.origin - c.at - (this.audio.now() - c.start)).toFixed(2)}s` : ''),
       `theme ${this.sequencer.theme ? this.sequencer.theme.join(' / ') : 'none'}  music ${this.audio.mode}  level ${this.audio.level.toFixed(2)}`,
     ];
     ctx.save();
@@ -611,10 +626,12 @@ export class Player {
   // --- controls ------------------------------------------------------------------------------
 
   skip() {
+    if (this.origin != null) return;   // no skipping ahead on a broadcast
     if (this.current) this.current.end = this.audio.now();
   }
 
   nextPhrase() {
+    if (this.origin != null) return;
     const ph = this.current?.phrase;
     const cyc = this.current?.cycle;
     while (this.queue.length && this.queue[0].phrase === ph && this.queue[0].cycle === cyc) {
@@ -634,11 +651,13 @@ export class Player {
       if (this.filling) await this.filling.catch(() => {});
       for (const c of this.queue) { c.dropped = true; if (c.slot) { this.release(c.slot); c.slot = null; } }
       this.queue = [];
+      this.origin = null;
+      this.streamTime = 0;
       if (fastForward > 0) await this.fastForward(fastForward);
     } finally {
       this.restarting = false;
     }
-    this.skip();
+    if (this.current) this.current.end = this.audio.now();
     return this.fillQueue();
   }
 
