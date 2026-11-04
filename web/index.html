@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>corecore</title>
+  <link rel="stylesheet" href="/web/styles.css">
+</head>
+<body>
+  <canvas id="stage" width="1280" height="720"></canvas>
+  <div id="videos" aria-hidden="true"></div>
+
+  <div id="splash">
+    <div class="splash-inner">
+      <h1>corecore</h1>
+      <p>an endless found-footage montage. sound on.</p>
+      <button id="start">start</button>
+      <p class="hint">space pause · n next phrase · h controls · i info · f fullscreen · r record · s reseed · m mode · v vertical · x ban clip</p>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="nowPlaying"></div>
+
+  <aside id="hud" class="hidden">
+    <header>
+      <strong>corecore</strong>
+      <button id="hideHud" title="hide (h)">×</button>
+    </header>
+
+    <section>
+      <h2>stream</h2>
+      <label>mode <select id="mode"></select></label>
+      <div id="modeBlurb" class="blurb"></div>
+      <label>seed <input id="seed" size="10"> <button id="reseed" type="button">new</button></label>
+      <label>frame <select id="aspect"><option value="16:9">16:9</option><option value="9:16">9:16 (vertical)</option><option value="1:1">1:1</option></select></label>
+      <label>music <select id="music"></select></label>
+      <label class="inline"><input type="checkbox" id="slowed"> slowed + reverb (tracks only)</label>
+      <label>volume <input type="range" id="volume" min="0" max="1" step="0.01" value="0.9"></label>
+      <label>your own captions (one per line; empty = built-in)<textarea id="customText" rows="3" placeholder="it's all so beautiful"></textarea></label>
+      <div class="row">
+        <button id="next" type="button" title="n">next phrase</button>
+        <button id="ban" type="button" title="x">ban clip</button>
+        <button id="info" type="button" title="i">info</button>
+        <button id="record" type="button" title="r">record</button>
+        <button id="fullscreen" type="button" title="f">fullscreen</button>
+        <button id="copyLink" type="button">copy link</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>pool</h2>
+      <div id="stats" class="stats">…</div>
+      <div id="tags" class="tags"></div>
+      <div id="empty" class="empty hidden">the pool is empty. queue the starter jobs below, or drop videos in <code>media/inbox</code> and run the <code>local</code> provider.</div>
+      <form id="jobForm">
+        <label>source
+          <select id="provider">
+            <option value="archive">Internet Archive (public domain / CC)</option>
+            <option value="ytdlp">yt-dlp (YouTube + others)</option>
+            <option value="local">local files (media/inbox or a path)</option>
+          </select>
+        </label>
+        <label>query or URL <input id="query" placeholder="collection:prelinger AND subject:(suburbs)"></label>
+        <label>max videos <input id="maxItems" type="number" min="0" max="200" value="5"></label>
+        <label>tags <input id="jobTags" placeholder="archive, home, childhood"></label>
+        <div class="row">
+          <button type="submit">scrape + clip</button>
+          <button id="seedStarter" type="button">queue starter set</button>
+        </div>
+      </form>
+      <ul id="jobs"></ul>
+    </section>
+  </aside>
+
+  <script type="module" src="/web/app.js"></script>
+</body>
+</html>
