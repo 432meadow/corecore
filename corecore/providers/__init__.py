@@ -15,9 +15,12 @@ def get_provider(name: str) -> Provider:
     if name in ("local", "file", "files", "inbox"):
         from .local import LocalProvider
         return LocalProvider()
-    raise ProviderError(f"unknown provider {name!r} (use archive, ytdlp or local)")
+    if name in ("dailymotion", "dm"):
+        from .dailymotion import DailymotionProvider
+        return DailymotionProvider()
+    raise ProviderError(f"unknown provider {name!r} (use archive, ytdlp, dailymotion or local)")
 
 
-PROVIDER_NAMES = ["archive", "ytdlp", "local"]
+PROVIDER_NAMES = ["archive", "ytdlp", "dailymotion", "local"]
 
 __all__ = ["Candidate", "Provider", "ProviderError", "get_provider", "PROVIDER_NAMES"]

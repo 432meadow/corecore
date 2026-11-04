@@ -46,6 +46,24 @@ LOCAL_ROOTS: list[Path] = [INBOX_DIR] + [Path(p).expanduser() for p in os.enviro
 MUSIC_EXTENSIONS = {".mp3", ".ogg", ".oga", ".wav", ".m4a", ".flac", ".aac", ".opus"}
 
 
+# Titles containing any of these are dropped by the search providers (adult material, gore, tabloid
+# violence). Extend with CORECORE_BLOCKLIST="word,word"; set CORECORE_BLOCKLIST=off to disable.
+_DEFAULT_BLOCKLIST = [
+    "naked", "nude", "nudes", "sex", "sexy", "porn", "xxx", "onlyfans", "ahegao", "sissy", "panties", "lingerie",
+    "try on", "try-on", "egirl", "e-girl", "omegle", "strip", "stripper", "hentai", "nsfw", "fetish", "bikini",
+    "shooting", "shoots", "shot dead", "killed", "killing", "murder", "beheading", "execution", "gore", "dead body",
+    "suicide", "rape", "isis", "massacre", "snuff",
+]
+_env_block = os.environ.get("CORECORE_BLOCKLIST", "")
+BLOCKLIST: list[str] = [] if _env_block.strip().lower() == "off" else (
+    _DEFAULT_BLOCKLIST + [w.strip().lower() for w in _env_block.split(",") if w.strip()])
+
+
+def blocked_title(title: str | None) -> bool:
+    t = (title or "").lower()
+    return any(w in t for w in BLOCKLIST)
+
+
 def ensure_dirs() -> None:
     for d in (MEDIA_DIR, SOURCES_DIR, SEGMENTS_DIR, THUMBS_DIR, MUSIC_DIR, INBOX_DIR):
         d.mkdir(parents=True, exist_ok=True)

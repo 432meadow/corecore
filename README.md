@@ -6,7 +6,7 @@ shots into an infinite stream: slow sad set-up, accelerating cuts, a burst of bl
 held image, a cut to black. Over and over, never the same twice, reproducible by seed.
 
 **Watch it:** https://432meadow.github.io/corecore/ is the static edition, rebuilt weekly by CI from
-public-domain footage on the Internet Archive. Add `?seed=live` and you are on the live channel: everyone
+footage on the Internet Archive (public domain by default; see Sources). Add `?seed=live` and you are on the live channel: everyone
 on that URL sees the same edit at the same moment.
 
 What the genre is and which of its conventions the generator encodes: [docs/CORECORE.md](docs/CORECORE.md).
@@ -111,32 +111,41 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 The URL carries `seed`, `mode`, `aspect`, `music` and `slowed`, so a link reproduces a stream over the same
 pool. "copy link" in the controls does that for you.
 
-## Sources, and a note on what you may scrape
+## Sources
 
-- **Internet Archive** (`archive`): the default. Public-domain and Creative-Commons video; the
-  Prelinger ephemeral films, NASA, newsreels, community uploads. Queries use the archive's search syntax,
-  e.g. `collection:prelinger AND subject:(television commercials)`, or paste an item URL. The `license`
-  field is stored per source.
-- **yt-dlp** (`ytdlp`): YouTube search terms, or any video/playlist/channel URL yt-dlp supports (Vimeo,
-  Dailymotion, TikTok, archive.org...). Downloading from YouTube is against its terms of service, and
-  YouTube blocks most anonymous datacenter traffic; from a home connection set
-  `YTDLP_COOKIES_FROM_BROWSER=chrome` (or `YTDLP_COOKIES_FILE=cookies.txt`). Keep the result for personal
-  use; a public deployment built on scraped commercial footage is your call and your risk.
-- **local** (`local`): files in `media/inbox/`, or any directory, file or glob you point it at. Originals
-  are never deleted.
+Two starter sets, one switch (`--set contemporary|archival|all`, or the two buttons in the controls):
 
-Sources that fail (no mp4 derivative, too long, download error) are recorded with the error in `/api/sources`
-and skipped; the job carries on.
+- **contemporary** (the default): internet-native material. The Internet Archive's `mirrortube` collection
+  holds about two million YouTube videos that people archived, 920k of them from 2022 on, with H.264 files:
+  dashcams, vlogs, walking tours, driving POVs, doorbell and CCTV clips, game moments, pets, raw footage,
+  ASMR. The queries use quoted phrases (the archive's search treats `dash cam` as dash OR cam), newest-first
+  ordering (`|sort=date desc` on any archive query) and a title blocklist (`CORECORE_BLOCKLIST`) that drops
+  adult and gore uploads, which otherwise dominate the popular end of that collection.
+- **archival**: the Prelinger ephemeral films, NASA and other public-domain footage. Legally the cleanest
+  pool, and what the public GitHub Pages build uses unless you set its `seed_set` input to `contemporary`.
 
-## Deploying
+Providers:
 
-- **GitHub Pages**: push to `main` (or run the `pages` workflow). One-time setup in the repository
-  settings: Pages → Source → "GitHub Actions". The workflow needs the repository to be public, or a
-  plan that allows private Pages.
-- **Full app in Docker**: `docker build -t corecore . && docker run -p 8000:8000 -v corecore-media:/app/media corecore`.
-  Put a reverse proxy with auth in front before exposing the ingest form to the internet: the local
-  provider reads paths on the server and yt-dlp fetches whatever URL it is given.
-- **Static export anywhere**: `python -m corecore export --out site --max-mb 450` and upload `site/`.
+- **Internet Archive** (`archive`): any search in the archive's own syntax, or an item URL. Works from
+  datacenters and CI. Item licences are stored per source.
+- **yt-dlp** (`ytdlp`): YouTube search terms, or any URL yt-dlp understands (YouTube, TikTok, Vimeo,
+  Twitch clips, Reddit posts...), or a pasted list of links, one per line. YouTube and TikTok block most
+  datacenter addresses (HTTP 403 on the video data), so run this provider on your own machine, where it
+  works, and with `YTDLP_COOKIES_FROM_BROWSER=chrome` (or `YTDLP_COOKIES_FILE`) it uses your own logged-in
+  session. This project does not try to get around those blocks. Downloading from YouTube is against its
+  terms of service; keep the result for personal use.
+- **Dailymotion** (`dailymotion`): public search API, no key; lots of dashcam compilations and odd uploads.
+  Downloads go through yt-dlp, whose Dailymotion extractor needs its browser-impersonation extra
+  (`pip install curl_cffi`); without it the job fails with that message.
+- **local** (`local`): files in `media/inbox/`, or, from the CLI, any directory, file or glob. Over the API
+  the provider only reads `media/inbox` and `CORECORE_LOCAL_ROOTS`. Originals are never deleted. The simplest
+  contemporary workflow: download on your laptop with your own tools, drop the files here.
+
+Not available: Reddit's listings refuse unauthenticated datacenter traffic, and Wikimedia's API rate-limits
+shared addresses; both are on the roadmap behind credentials.
+
+A word on publishing: the archival set is public domain. Mirrored web video is other people's work; a
+private pool is one thing, a public site built from it is your call and your risk.
 
 ## Configuration
 
@@ -156,6 +165,8 @@ Environment variables, all optional:
 | `CORECORE_NO_WORKER` | unset | `1` disables the in-process worker (run `python -m corecore worker` elsewhere) |
 | `CORECORE_ARCHIVE_PREFER_SMALL` | 0 | `1` prefers the 512 kb/s Internet Archive derivative (faster builds) |
 | `CORECORE_ARCHIVE_PAGE` | 1 | which page of Internet Archive results to take (CI rotates it weekly) |
+| `CORECORE_BLOCKLIST` | built-in list | extra comma-separated title words to drop; `off` disables the filter |
+| `CORECORE_LOCAL_ROOTS` | `media/inbox` | extra directories the local provider may read over the API (path-separator separated) |
 | `YTDLP_COOKIES_FROM_BROWSER`, `YTDLP_COOKIES_FILE`, `YTDLP_MAX_HEIGHT` | | yt-dlp options |
 
 ## API

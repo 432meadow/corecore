@@ -53,6 +53,12 @@ class YtDlpProvider(Provider):
             raise ProviderError("yt-dlp is not installed (pip install yt-dlp)") from e
         if not (url or query):
             raise ProviderError("ytdlp provider needs a query or a URL")
+        urls = [u for u in (url or "").split() if u.startswith(("http://", "https://"))]
+        if len(urls) > 1:
+            # a pasted list of links (TikTok, YouTube, anything yt-dlp knows): no extraction up front,
+            # the download step fills in the title
+            limit = max_items if max_items > 0 else len(urls)
+            return [Candidate("ytdlp", u, u, title=u.rsplit("/", 1)[-1][:80]) for u in urls[:limit]]
         target = url or f"ytsearch{max(1, max_items * 2)}:{query}"
         try:
             # "only_download": skip broken entries inside a playlist, but a failing top-level URL is an error
@@ -70,7 +76,7 @@ class YtDlpProvider(Provider):
                 continue
             page = e.get("webpage_url") or e.get("original_url") or e.get("url")
             ext_id = e.get("id") or page
-            if not page or not ext_id:
+            if not page or not ext_id or config.blocked_title(e.get("title")):
                 continue
             cands.append(Candidate("ytdlp", str(ext_id), page, title=e.get("title") or "", uploader=e.get("uploader")
                                    or e.get("channel") or "", duration=float(dur) if dur else None,
@@ -94,6 +100,10 @@ class YtDlpProvider(Provider):
             raise ProviderError(f"yt-dlp: {e}") from e
         if not info:
             raise ProviderError("yt-dlp returned nothing")
+        if cand.title == cand.url.rsplit("/", 1)[-1][:80]:  # pasted link: take the real metadata now
+            cand.title = info.get("title") or cand.title
+            cand.uploader = info.get("uploader") or info.get("channel") or cand.uploader
+            cand.duration = float(info["duration"]) if info.get("duration") else cand.duration
         # A max_filesize abort is not an error for yt-dlp: it just leaves no filepath (and a .part on disk).
         path = next((Path(d["filepath"]) for d in info.get("requested_downloads") or [] if d.get("filepath")), None)
         if path is None or not path.exists() or path.suffix == ".part":

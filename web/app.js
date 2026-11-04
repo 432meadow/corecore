@@ -209,10 +209,11 @@ async function submitJob(ev) {
   ev.preventDefault();
   const provider = $('#provider').value;
   const query = $('#query').value.trim();
+  const isUrl = /^https?:\/\//.test(query);
   const body = {
     provider,
-    query: /^https?:\/\//.test(query) ? null : query || null,
-    url: /^https?:\/\//.test(query) ? query : null,
+    query: isUrl ? null : query || null,
+    url: isUrl ? query : null,
     max_items: Number($('#maxItems').value) || 5,
     tags: $('#jobTags').value,
   };
@@ -223,10 +224,10 @@ async function submitJob(ev) {
   refreshJobs();
 }
 
-async function seedStarter() {
-  const r = await fetch('api/seed', { method: 'POST' });
+async function seedStarter(set) {
+  const r = await fetch(`api/seed?set=${encodeURIComponent(set)}`, { method: 'POST' });
   const j = await r.json();
-  toast(`queued ${j.queued.length} starter jobs (Internet Archive)`);
+  toast(`queued ${j.queued.length} ${set} jobs`);
   refreshJobs();
 }
 
@@ -299,7 +300,8 @@ function wire() {
   $('#info').addEventListener('click', () => { player.showInfo = !player.showInfo; });
   $('#hideHud').addEventListener('click', () => $('#hud').classList.add('hidden'));
   $('#jobForm').addEventListener('submit', submitJob);
-  $('#seedStarter').addEventListener('click', seedStarter);
+  $('#seedStarter').addEventListener('click', () => seedStarter('contemporary'));
+  $('#seedArchival').addEventListener('click', () => seedStarter('archival'));
   $('#jobs').addEventListener('click', async (e) => {
     const id = e.target.dataset.cancel;
     if (id) { await fetch(`api/jobs/${id}/cancel`, { method: 'POST' }); refreshJobs(); }

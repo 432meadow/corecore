@@ -13,6 +13,9 @@ on:
       max_mb:
         description: size budget of the exported site in MB
         default: "450"
+      seed_set:
+        description: "which starter set to scrape: archival (public domain), contemporary (mirrored web video), all"
+        default: "archival"
   schedule:
     - cron: "17 4 * * 1"
   push:
@@ -67,6 +70,7 @@ jobs:
           export CORECORE_ARCHIVE_PAGE=$(( (10#$(date +%U) % 6) + 1 ))
           echo "archive page $CORECORE_ARCHIVE_PAGE"
           python -m corecore build-site --out site \
+            --set "${{ github.event.inputs.seed_set || 'archival' }}" \
             --time-budget "${{ github.event.inputs.time_budget || '1500' }}" \
             --max-mb "${{ github.event.inputs.max_mb || '450' }}"
           python -m corecore stats

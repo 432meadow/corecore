@@ -10,8 +10,12 @@ Rough order of usefulness. Nothing here is started.
 - **Speech detection** (a VAD such as Silero, or whisper-tiny) so `voice` phrases find real talking heads,
   and so captions can quote what is being said, which is a strong corecore device. (Face tagging with a
   Haar cascade is in; a modern detector would cut the false positives on grainy film.)
-- **More providers**: Pexels / Pixabay / Coverr APIs (free stock, API key), Wikimedia Commons, Vimeo
-  CC search, TikTok via yt-dlp URL lists, RSS of news clips.
+- **More providers**: Reddit video via OAuth app credentials (r/dashcam, r/oddlyterrifying, r/liminalspace
+  are the genre's natural habitat; unauthenticated listings are blocked from datacenters), Wikimedia Commons
+  with a registered user agent, Pexels / Pixabay / Coverr APIs (free stock, API key), Vimeo CC search,
+  Twitch clips via the Helix API, public DOT traffic-camera HLS streams recorded with ffmpeg.
+- **Visual relevance search**: with CLIP embeddings in place, "more like this" across the pool, and
+  automatic pairing of a found clip with its most opposite neighbour.
 - **Shot quality filter**: drop near-black, near-static or slate/title-card shots; dedupe near-identical
   shots across sources with a perceptual hash of the thumbnail.
 - **Curation grid**: a page of thumbnails with tag editing, ban/unban, "more like this".

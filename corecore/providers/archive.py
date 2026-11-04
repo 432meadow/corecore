@@ -47,8 +47,14 @@ def _first(v):
     return v[0] if isinstance(v, list) and v else v
 
 
+# Any container ffmpeg reads is fine (everything is re-encoded); mp4 derivatives rank first, then the
+# originals people upload (yt-dlp mirrors are mostly .webm/.mkv), then legacy formats.
+VIDEO_SUFFIXES = {".mp4": 0, ".m4v": 0, ".webm": 1, ".mkv": 1, ".mov": 2, ".ogv": 3, ".avi": 3, ".mpg": 3, ".mpeg": 3,
+                  ".flv": 4, ".wmv": 4, ".m2ts": 4, ".ts": 4}
+
+
 def choose_file(files: list[dict], prefer_small: bool | None = None) -> dict | None:
-    """Pick the best mp4 derivative from an item's file list. CORECORE_ARCHIVE_PREFER_SMALL=1 favours the
+    """Pick the best video file from an item's file list. CORECORE_ARCHIVE_PREFER_SMALL=1 favours the
     512 kb/s derivative, which downloads several times faster and is plenty for a 540p clip pool."""
     if prefer_small is None:
         prefer_small = os.environ.get("CORECORE_ARCHIVE_PREFER_SMALL", "0") == "1"
@@ -57,7 +63,8 @@ def choose_file(files: list[dict], prefer_small: bool | None = None) -> dict | N
     best_key = None
     for f in files:
         name = f.get("name", "")
-        if not name.lower().endswith(".mp4"):
+        suffix = "." + name.lower().rsplit(".", 1)[-1] if "." in name else ""
+        if suffix not in VIDEO_SUFFIXES:
             continue
         fmt = f.get("format", "")
         try:
@@ -66,8 +73,8 @@ def choose_file(files: list[dict], prefer_small: bool | None = None) -> dict | N
             size = 0
         if size and size > config.MAX_SOURCE_BYTES:
             continue
-        rank = order.index(fmt) if fmt in order else len(order)
-        # prefer the preferred format, then the smaller file (we re-encode to 720p anyway)
+        rank = order.index(fmt) if fmt in order else len(order) + VIDEO_SUFFIXES[suffix]
+        # prefer the preferred format, then the smaller file (we re-encode anyway)
         key = (rank, size or 10 ** 12)
         if best_key is None or key < best_key:
             best, best_key = f, key
@@ -90,10 +97,14 @@ class ArchiveProvider(Provider):
                               license=str(_first(md.get("licenseurl")) or ""))]
         if not query:
             raise ProviderError("archive provider needs a query or an item URL")
+        sort = "downloads desc"
+        if "|sort=" in query:  # e.g. "collection:mirrortube AND title:(vlog) |sort=date desc"
+            query, _, sort = query.partition("|sort=")
+            query, sort = query.strip(), sort.strip() or "downloads desc"
         q = query if "mediatype:" in query else f"({query}) AND mediatype:movies"
         page = os.environ.get("CORECORE_ARCHIVE_PAGE", "1")  # rotate pages across scheduled builds for fresh material
         params = [("q", q), ("rows", str(max(1, max_items * 3))), ("page", page if page.isdigit() else "1"),
-                  ("output", "json"), ("sort[]", "downloads desc")]
+                  ("output", "json"), ("sort[]", sort)]
         for fl in ("identifier", "title", "creator", "licenseurl", "runtime"):
             params.append(("fl[]", fl))
         data = _get_json(SEARCH_URL + "?" + urllib.parse.urlencode(params))
@@ -106,7 +117,7 @@ class ArchiveProvider(Provider):
             if dur and dur > config.MAX_SOURCE_DURATION:
                 continue
             ident = d.get("identifier")
-            if not ident:
+            if not ident or config.blocked_title(str(_first(d.get("title")) or "")):
                 continue
             cands.append(Candidate("archive", ident, f"https://archive.org/details/{ident}",
                                    title=str(_first(d.get("title")) or ident), uploader=str(_first(d.get("creator")) or ""),
@@ -119,9 +130,10 @@ class ArchiveProvider(Provider):
         meta = _get_json(META_URL + urllib.parse.quote(cand.external_id))
         f = choose_file(meta.get("files", []))
         if not f:
-            raise ProviderError(f"{cand.external_id}: no mp4 derivative under {config.MAX_SOURCE_BYTES // 2**20} MB")
+            raise ProviderError(f"{cand.external_id}: no video file under {config.MAX_SOURCE_BYTES // 2**20} MB")
         url = DOWNLOAD_URL + urllib.parse.quote(cand.external_id) + "/" + urllib.parse.quote(f["name"])
-        dest = dest_dir / f"archive_{cand.external_id}.mp4"
+        suffix = "." + f["name"].rsplit(".", 1)[-1].lower()
+        dest = dest_dir / f"archive_{cand.external_id}{suffix}"
         log(f"downloading {f['name']} ({int(f.get('size') or 0) // 2**20} MB)")
         req = urllib.request.Request(url, headers={"User-Agent": config.HTTP_USER_AGENT})
         part = dest.with_suffix(".part")

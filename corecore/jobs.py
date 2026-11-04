@@ -113,13 +113,14 @@ def run_job(job_id: int, echo: Callable[[str], None] | None = None, deadline: fl
     _update(job_id, status="done", progress=1.0, clips_added=added, message=f"done: {added} clips added")
 
 
-def run_starter_jobs(time_budget: float, echo: Callable[[str], None] | None = None) -> dict:
-    """Run the curated starter list in the foreground within a time budget (used by `build-site` and CI)."""
-    from .seeds import STARTER_JOBS
+def run_starter_jobs(time_budget: float, echo: Callable[[str], None] | None = None, seed_set: str = "contemporary") -> dict:
+    """Run a curated starter list in the foreground within a time budget (used by `build-site` and CI)."""
+    from . import seeds
 
+    jobs_list = seeds.SEED_SETS.get(seed_set, seeds.STARTER_JOBS)
     deadline = time.monotonic() + time_budget
-    summary = {"jobs": 0, "clips": 0, "stopped_early": False}
-    for j in STARTER_JOBS:
+    summary = {"jobs": 0, "clips": 0, "stopped_early": False, "set": seed_set}
+    for j in jobs_list:
         if time.monotonic() > deadline:
             summary["stopped_early"] = True
             break

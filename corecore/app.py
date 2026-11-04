@@ -164,10 +164,13 @@ def jobs_cancel(job_id: int):
 
 
 @app.post("/api/seed")
-def seed():
-    from .seeds import STARTER_JOBS
-    ids = [create_job(j["provider"], j.get("query"), j.get("url"), j.get("max_items", 5), j.get("tags")) for j in STARTER_JOBS]
-    return {"queued": ids}
+def seed(set: str = "contemporary"):
+    from .seeds import SEED_SETS
+    jobs_list = SEED_SETS.get(set)
+    if jobs_list is None:
+        raise HTTPException(400, f"unknown set {set!r}; use contemporary, archival or all")
+    ids = [create_job(j["provider"], j.get("query"), j.get("url"), j.get("max_items", 5), j.get("tags")) for j in jobs_list]
+    return {"queued": ids, "set": set}
 
 
 @app.get("/api/music")

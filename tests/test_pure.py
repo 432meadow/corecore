@@ -60,7 +60,12 @@ class ArchiveTest(unittest.TestCase):
         ]
         self.assertEqual(choose_file(files)["name"], "ia.mp4")
         self.assertEqual(choose_file(files[:4])["name"], "small.mp4")
-        self.assertIsNone(choose_file([{"name": "x.avi", "format": "AVI", "size": "1"}]))
+        self.assertIsNone(choose_file([{"name": "x.txt", "format": "Text", "size": "1"}]))
+        # yt-dlp mirrors: no mp4 derivative, a .webm or .mkv original is fine (we re-encode anyway)
+        mirror = [{"name": "abc.webm", "format": "WebM", "size": "300"}, {"name": "abc.mkv", "format": "Matroska", "size": "400"},
+                  {"name": "abc.jpg", "format": "JPEG", "size": "5"}]
+        self.assertEqual(choose_file(mirror)["name"], "abc.webm")
+        self.assertEqual(choose_file(mirror + [{"name": "abc.mp4", "format": "h.264", "size": "900"}])["name"], "abc.mp4")
 
 
 class YtDlpTest(unittest.TestCase):
@@ -177,18 +182,17 @@ class StarterBudgetTest(unittest.TestCase):
             src = Path(d) / "tiny.mp4"
             subprocess.run([config.FFMPEG, "-y", "-loglevel", "error", "-t", "3", "-f", "lavfi", "-i", "testsrc2=s=160x90:r=10",
                             "-c:v", "libx264", "-preset", "ultrafast", str(src)], check=True)
-            original = seeds.STARTER_JOBS
-            seeds.STARTER_JOBS = [{"provider": "local", "url": str(src), "max_items": 1, "tags": ["t"]}]
+            seeds.SEED_SETS["test"] = [{"provider": "local", "url": str(src), "max_items": 1, "tags": ["t"]}]
             config.LOCAL_ROOTS.append(Path(d))
             try:
-                none = jobs.run_starter_jobs(time_budget=0)
+                none = jobs.run_starter_jobs(time_budget=0, seed_set="test")
                 self.assertEqual(none["jobs"], 0)
                 self.assertTrue(none["stopped_early"])
-                done = jobs.run_starter_jobs(time_budget=120)
+                done = jobs.run_starter_jobs(time_budget=120, seed_set="test")
                 self.assertEqual(done["jobs"], 1)
                 self.assertGreaterEqual(done["clips"], 1)
             finally:
-                seeds.STARTER_JOBS = original
+                del seeds.SEED_SETS["test"]
                 config.LOCAL_ROOTS.remove(Path(d))
                 with db.connect() as conn:
                     conn.execute("DELETE FROM sources")
@@ -277,3 +281,33 @@ class ReviewRegressionTest(unittest.TestCase):
         paths = [r.path for r in app.routes]
         self.assertIn("/media/segments", paths)
         self.assertNotIn("/media", paths)
+
+
+class ContemporaryTest(unittest.TestCase):
+    def test_blocklist(self):
+        self.assertTrue(config.blocked_title("GIRL GETS NAKED ON CAM FOR YOUTUBE"))
+        self.assertFalse(config.blocked_title("Shibuya New Year Walk 4K"))
+        self.assertFalse(config.blocked_title(None))
+
+    def test_ytdlp_pasted_links_become_candidates(self):
+        from corecore.providers.ytdlp import YtDlpProvider
+        cands = YtDlpProvider().search(None, "https://www.tiktok.com/@a/video/1\nhttps://youtu.be/xyz https://vimeo.com/1", 0)
+        self.assertEqual([c.url for c in cands], ["https://www.tiktok.com/@a/video/1", "https://youtu.be/xyz", "https://vimeo.com/1"])
+        self.assertEqual(len(YtDlpProvider().search(None, "https://youtu.be/a https://youtu.be/b", 1)), 1)
+
+    def test_archive_sort_suffix(self):
+        from corecore.providers import archive
+        seen = {}
+        archive._get_json = (lambda orig: lambda url, timeout=60: (seen.setdefault("url", url), {"response": {"docs": []}})[1])(archive._get_json)
+        try:
+            archive.ArchiveProvider().search('collection:mirrortube AND title:(vlog) |sort=date desc', None, 2)
+            self.assertIn("sort%5B%5D=date+desc", seen["url"])
+            self.assertNotIn("%7Csort", seen["url"])
+        finally:
+            import importlib
+            importlib.reload(archive)
+
+    def test_seed_sets(self):
+        from corecore import seeds
+        self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "archival", "all"})
+        self.assertTrue(all(j["provider"] in ("archive", "dailymotion") for j in seeds.CONTEMPORARY_JOBS))

@@ -24,7 +24,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max", "-n", type=int, default=5, dest="max_items")
     p.add_argument("--tags", "-t", default="", help="comma-separated tags, e.g. nature,archive")
 
-    sub.add_parser("seed", help="queue the starter Internet Archive jobs")
+    p = sub.add_parser("seed", help="queue a starter set of scrape jobs")
+    p.add_argument("--set", default="contemporary", choices=["contemporary", "archival", "all"], dest="seed_set")
 
     p = sub.add_parser("export", help="write the player + a bounded slice of the pool as a static site")
     p.add_argument("--out", default="site")
@@ -39,6 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max-mb", type=float, default=450, dest="max_mb")
     p.add_argument("--max-clips", type=int, default=2000, dest="max_clips")
     p.add_argument("--skip-ingest", action="store_true", dest="skip_ingest")
+    p.add_argument("--set", default="contemporary", choices=["contemporary", "archival", "all"], dest="seed_set")
 
     sub.add_parser("tag-faces", help="(re)run face detection over the pool; needs opencv-python-headless")
     sub.add_parser("worker", help="run only the ingest worker (drain queued jobs)")
@@ -71,8 +73,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "seed":
         from .jobs import create_job
-        from .seeds import STARTER_JOBS
-        for j in STARTER_JOBS:
+        from .seeds import SEED_SETS
+        for j in SEED_SETS[args.seed_set]:
             jid = create_job(j["provider"], j.get("query"), j.get("url"), j.get("max_items", 5), j.get("tags"))
             print(f"queued job {jid}: {j['provider']} {j.get('query') or j.get('url')}")
         print("start `python -m corecore serve` (or `worker`) to run them")
@@ -82,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         from .export import export_site
         if args.cmd == "build-site" and not args.skip_ingest:
             from .jobs import run_starter_jobs
-            summary = run_starter_jobs(args.time_budget, echo=lambda m: print(f"  {m}"))
+            summary = run_starter_jobs(args.time_budget, echo=lambda m: print(f"  {m}"), seed_set=args.seed_set)
             print(f"ingest: {summary}")
         result = export_site(args.out, height=args.height, max_bytes=int(args.max_mb * 1024 * 1024), max_clips=args.max_clips)
         print(result)

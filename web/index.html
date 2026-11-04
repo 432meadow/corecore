@@ -64,16 +64,18 @@
         <label>source
           <select id="provider">
             <option value="archive">Internet Archive (public domain / CC)</option>
-            <option value="ytdlp">yt-dlp (YouTube + others)</option>
+            <option value="ytdlp">yt-dlp (YouTube, TikTok + others; works from home)</option>
+            <option value="dailymotion">Dailymotion search</option>
             <option value="local">local files (media/inbox or a path)</option>
           </select>
         </label>
-        <label>query or URL <input id="query" placeholder="collection:prelinger AND subject:(suburbs)"></label>
+        <label>query, URL, or a pasted list of links (one per line) <textarea id="query" rows="2" placeholder='collection:mirrortube AND title:("dash cam") |sort=date desc'></textarea></label>
         <label>max videos <input id="maxItems" type="number" min="0" max="200" value="5"></label>
         <label>tags <input id="jobTags" placeholder="archive, home, childhood"></label>
         <div class="row">
           <button type="submit">scrape + clip</button>
-          <button id="seedStarter" type="button">queue starter set</button>
+          <button id="seedStarter" type="button" data-set="contemporary">queue contemporary set</button>
+          <button id="seedArchival" type="button" data-set="archival">queue archival set</button>
         </div>
       </form>
       <ul id="jobs"></ul>
