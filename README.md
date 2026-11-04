@@ -41,7 +41,7 @@ python -m corecore ingest --provider local --url ~/Videos/holiday --tags home,ch
 ```
 
 Drop music into `media/music/` (mp3, ogg, wav, m4a, flac) and it shows up in the music menu, with an
-optional slowed + reverb treatment. With no music of your own, a built-in generative ambient bed plays.
+optional slowed + reverb treatment. With no music of your own, the built-in generative wash plays (see Music below).
 
 ## Two editions
 
@@ -80,6 +80,13 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 - **Player** (`web/player.js`): cuts on the AudioContext clock, cover-fits clips with a slow push-in,
   adds grain, vignette, flashes, letterboxing, shake, double exposure, freeze frames and captions, and
   lets strong music onsets pull a cut forward.
+- **Music** (`web/wash.js`): the default bed is *the wash*, a generative ambient score with almost no notes.
+  Detuned strings through a slow lowpass, a formant choir, a breath of filtered noise, a sub and an occasional
+  shimmer drift through suspended harmony (sus2, add9, m9, m11) by voice leading, under a 7.5 s reverb, and
+  the whole bed breathes on a 25-second cycle. It follows the edit: the player tells it which phrase is on
+  screen, so it thins out on a dwell, opens through a build, holds through a burst, swells into the climax
+  and drops on the cut to black. Each mode has its own palette (mode, root, brightness, motion, dissonance).
+  The music menu also offers a generated piano, the older ambient pad, and your own tracks.
 - **Modes**: `corecore` (default), `online` (contemporary material with a cinematic treatment: slow
   motion and speed ramps, vlog jump cuts, sound bleeding across cuts, a piano bed), `hopecore` (warmer,
   quotes, no cut to black), `chaos` (the 2023 nichetok turn: layered, random speeds, textures), `dwell`
