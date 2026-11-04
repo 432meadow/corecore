@@ -6,7 +6,7 @@ shots into an infinite stream: slow sad set-up, accelerating cuts, a burst of bl
 held image, a cut to black. Over and over, never the same twice, reproducible by seed.
 
 **Watch it:** https://432meadow.github.io/corecore/ is the static edition, rebuilt weekly by CI from
-footage on the Internet Archive (public domain by default; see Sources). Add `?seed=live` and you are on the live channel: everyone
+contemporary web video mirrored on the Internet Archive (see Sources). Add `?seed=live` and you are on the live channel: everyone
 on that URL sees the same edit at the same moment.
 
 What the genre is and which of its conventions the generator encodes: [docs/CORECORE.md](docs/CORECORE.md).
@@ -122,7 +122,8 @@ Two starter sets, one switch (`--set contemporary|archival|all`, or the two butt
   ordering (`|sort=date desc` on any archive query) and a title blocklist (`CORECORE_BLOCKLIST`) that drops
   adult and gore uploads, which otherwise dominate the popular end of that collection.
 - **archival**: the Prelinger ephemeral films, NASA and other public-domain footage. Legally the cleanest
-  pool, and what the public GitHub Pages build uses unless you set its `seed_set` input to `contemporary`.
+  pool. The public GitHub Pages build scrapes the contemporary set and exports only clips tagged `modern`;
+  its `seed_set` workflow input switches it.
 
 Providers:
 

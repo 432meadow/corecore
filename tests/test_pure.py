@@ -163,6 +163,8 @@ class ExportTest(unittest.TestCase):
             out = Path(d) / "site"
             summary = export_site(out, log=lambda m: None)
             self.assertEqual(summary["clips"], 1)
+            self.assertEqual(export_site(Path(d) / "none", tags=["modern"], log=lambda m: None)["clips"], 0)
+            self.assertEqual(export_site(Path(d) / "some", tags=["ads", "modern"], log=lambda m: None)["clips"], 1)
             manifest = json.loads((out / "manifest.json").read_text())
             self.assertEqual(manifest["sources"][0]["title"], "Design for Dreaming (1956)")
             self.assertEqual(manifest["clips"][0]["file"], "clips/exp_000.mp4")

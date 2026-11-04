@@ -32,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--height", type=int, default=None, help="re-encode clips taller than this (default: copy as is)")
     p.add_argument("--max-mb", type=float, default=450, dest="max_mb")
     p.add_argument("--max-clips", type=int, default=2000, dest="max_clips")
+    p.add_argument("--tags", default="", help="export only clips with at least one of these comma-separated tags")
 
     p = sub.add_parser("build-site", help="scrape the starter list within a time budget, then export (what CI runs)")
     p.add_argument("--out", default="site")
@@ -41,6 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max-clips", type=int, default=2000, dest="max_clips")
     p.add_argument("--skip-ingest", action="store_true", dest="skip_ingest")
     p.add_argument("--set", default="contemporary", choices=["contemporary", "archival", "all"], dest="seed_set")
+    p.add_argument("--tags", default="", help="export only clips with at least one of these comma-separated tags")
 
     sub.add_parser("tag-faces", help="(re)run face detection over the pool; needs opencv-python-headless")
     sub.add_parser("worker", help="run only the ingest worker (drain queued jobs)")
@@ -86,7 +88,8 @@ def main(argv: list[str] | None = None) -> int:
             from .jobs import run_starter_jobs
             summary = run_starter_jobs(args.time_budget, echo=lambda m: print(f"  {m}"), seed_set=args.seed_set)
             print(f"ingest: {summary}")
-        result = export_site(args.out, height=args.height, max_bytes=int(args.max_mb * 1024 * 1024), max_clips=args.max_clips)
+        result = export_site(args.out, height=args.height, max_bytes=int(args.max_mb * 1024 * 1024), max_clips=args.max_clips,
+                             tags=[t for t in args.tags.split(",") if t.strip()] or None)
         print(result)
         return 0
 
