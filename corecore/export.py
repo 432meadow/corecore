@@ -70,6 +70,8 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
             "SELECT c.*, s.title AS source_title FROM clips c JOIN sources s ON s.id = c.source_id "
             "WHERE c.banned = 0 ORDER BY c.id").fetchall()
         rows = [dict(r) for r in rows]
+        # the blocklist is applied again here: it may have grown since a source was scraped into the pool
+        rows = [r for r in rows if not config.blocked_title(r.get("source_title"))]
         if tags:
             wanted = {t.strip().lower() for t in tags if t.strip()}
             rows = [r for r in rows if wanted & set(db.tags_from_db(r["tags"]))]

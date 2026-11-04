@@ -53,7 +53,8 @@ _DEFAULT_BLOCKLIST = [
     "try on", "try-on", "egirl", "e-girl", "omegle", "strip", "stripper", "hentai", "nsfw", "fetish", "bikini",
     "shooting", "shoots", "shootout", "shot dead", "killed", "killing", "kills", "murder", "homicide", "assassin",
     "beheading", "execution", "gore", "dead body", "suicide", "rape", "isis", "massacre", "snuff", "combat footage",
-    "airstrike", "drone strike",
+    "airstrike", "drone strike", "graphic", "terror", "terrorist", "war footage", "frontline", "9/11", "9 11",
+    "hostage", "stabbing", "stabbed", "bodycam", "body cam",
 ]
 _env_block = os.environ.get("CORECORE_BLOCKLIST", "")
 BLOCKLIST: list[str] = [] if _env_block.strip().lower() == "off" else (

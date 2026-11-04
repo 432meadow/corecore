@@ -165,6 +165,9 @@ class ExportTest(unittest.TestCase):
             self.assertEqual(summary["clips"], 1)
             self.assertEqual(export_site(Path(d) / "none", tags=["modern"], log=lambda m: None)["clips"], 0)
             self.assertEqual(export_site(Path(d) / "some", tags=["ads", "modern"], log=lambda m: None)["clips"], 1)
+            with db.connect() as conn:  # a source whose title is now on the blocklist is not exported
+                conn.execute("UPDATE sources SET title = 'Concert hall attack RAW VIDEO [GRAPHIC]' WHERE external_id = 'exp'")
+            self.assertEqual(export_site(Path(d) / "blocked", log=lambda m: None)["clips"], 0)
             manifest = json.loads((out / "manifest.json").read_text())
             self.assertEqual(manifest["sources"][0]["title"], "Design for Dreaming (1956)")
             self.assertEqual(manifest["clips"][0]["file"], "clips/exp_000.mp4")
