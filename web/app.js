@@ -22,12 +22,13 @@ const state = {
   mode: MODES[params.get('mode')] ? params.get('mode') : 'corecore',
   aspect: ['16:9', '9:16', '1:1', '2.39:1'].includes(params.get('aspect')) ? params.get('aspect') : '16:9',
   music: params.get('music') || 'generated',
+  tags: (params.get('tags') || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
   slowed: params.get('slowed') === '1',
   started: false,
 };
 
 const audio = new AudioEngine();
-const catalog = STATIC ? new StaticCatalog({ seed: seedToInt(state.seed), manifestUrl: STATIC }) : new Catalog({ seed: seedToInt(state.seed) });
+const catalog = STATIC ? new StaticCatalog({ seed: seedToInt(state.seed), manifestUrl: STATIC, tags: state.tags }) : new Catalog({ seed: seedToInt(state.seed), tags: state.tags });
 const sequencer = new Sequencer({ catalog, seed: state.seed, mode: state.mode });
 const canvas = $('#stage');
 const player = new Player({ canvas, audio, catalog, sequencer, videoHost: $('#videos') });
@@ -48,6 +49,7 @@ function toast(msg, ms = 2200) {
 function syncUrl() {
   const p = new URLSearchParams({ seed: state.live ? 'live' : state.seed, mode: state.mode, aspect: state.aspect, music: state.music });
   if (state.slowed) p.set('slowed', '1');
+  if (state.tags.length) p.set('tags', state.tags.join(','));
   history.replaceState(null, '', `?${p}`);
 }
 
@@ -273,6 +275,15 @@ function wire() {
   fillModes();
   fillMusic();
   $('#seed').value = state.live ? 'live' : state.seed;
+  $('#poolTags').value = state.tags.join(', ');
+  $('#poolTags').addEventListener('change', async (e) => {
+    state.tags = e.target.value.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+    catalog.setTags(state.tags);
+    await refreshStats();
+    if (state.started) player.restart(state.live ? liveElapsed() : 0);
+    syncUrl();
+    toast(state.tags.length ? `playing only: ${state.tags.join(', ')}` : 'playing everything');
+  });
   $('#aspect').value = state.aspect;
   $('#slowed').checked = state.slowed;
   player.setAspect(state.aspect);

@@ -2,8 +2,9 @@
 // StaticCatalog (below) is the same thing fed by an exported manifest.json, for static hosting.
 import { makeRng } from './prng.js';
 export class Catalog {
-  constructor({ seed = null } = {}) {
+  constructor({ seed = null, tags = [] } = {}) {
     this.seed = seed;
+    this.tags = tags;          // when set, only clips carrying one of these tags are played
     this.pool = [];
     this.recent = [];
     this.bad = new Set();
@@ -17,7 +18,19 @@ export class Catalog {
   async refreshStats() {
     const r = await fetch('api/stats');
     this.stats = await r.json();
+    if (this.tags.length) {   // restrict the sequencer's view of the pool to the chosen tags
+      const r2 = await fetch(`api/clips/sample?n=500&tags=${encodeURIComponent(this.tags.join(','))}`);
+      const j = await r2.json();
+      this.stats = Object.assign({}, this.stats, computeStats(j.clips || []));
+    }
     return this.stats;
+  }
+
+  setTags(tags) {
+    this.tags = tags;
+    this.pool = [];
+    this.recent = [];
+    this.generation = 0;
   }
 
   // Refill from the server. Recently played clips are excluded first; if that leaves too little
@@ -54,6 +67,7 @@ export class Catalog {
   async fetchInto(n, exclude) {
     const params = new URLSearchParams({ n: String(n), exclude: exclude.join(',') });
     if (this.seed != null) params.set('seed', String((this.seed + this.generation++) >>> 0));
+    if (this.tags.length) params.set('tags', this.tags.join(','));
     const r = await fetch(`api/clips/sample?${params}`);
     if (!r.ok) throw new Error(`sample failed: ${r.status}`);
     const j = await r.json();
@@ -136,11 +150,25 @@ export function computeStats(clips) {
 // Static edition: the whole pool is in memory, picks are deterministic for a given seed and sequence of
 // calls (no timing-dependent refills), which is what makes the synchronized live channel possible.
 export class StaticCatalog extends Catalog {
-  constructor({ seed = null, manifestUrl = 'manifest.json' } = {}) {
-    super({ seed });
+  constructor({ seed = null, manifestUrl = 'manifest.json', tags = [] } = {}) {
+    super({ seed, tags });
     this.manifestUrl = manifestUrl;
     this.all = null;
+    this.everything = null;
     this.manifest = null;
+  }
+
+  setTags(tags) {
+    this.tags = tags;
+    this.recent = [];
+    if (this.everything) { this.all = this.filtered(); this.recomputeStats(); }
+  }
+
+  filtered() {
+    if (!this.tags.length) return this.everything;
+    const want = new Set(this.tags);
+    const subset = this.everything.filter((c) => c.tags.some((t) => want.has(t)));
+    return subset.length ? subset : this.everything;
   }
 
   get size() { return this.all ? this.all.length - this.bad.size : 0; }
@@ -167,6 +195,8 @@ export class StaticCatalog extends Catalog {
       };
     });
     this.manifest = m;
+    this.everything = this.all;
+    this.all = this.filtered();
     try {
       for (const id of JSON.parse(localStorage.getItem('corecore.banned') || '[]')) this.bad.add(id);
     } catch (e) { /* no storage */ }
