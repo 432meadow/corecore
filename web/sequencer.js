@@ -43,7 +43,7 @@ export const MODES = {
     black: { chance: 0.8, dur: [0.5, 1.8], silence: 0.3, text: 0.05 },
     fx: { grain: [0.07, 0.14], desat: 0.2, contrast: 1.08, letterbox: 0.15, bw: 0.04 },
     prefer: { brightness: -0.4 },
-    textStyle: 'caption', textPool: 'captions',
+    textStyle: 'caption', textPool: 'captions', useTitles: true,
   },
   hopecore: {
     label: 'hopecore',
@@ -59,7 +59,7 @@ export const MODES = {
     black: { chance: 0.15, dur: [0.4, 0.8], silence: 0, text: 0 },
     fx: { grain: [0.04, 0.09], desat: 0.0, contrast: 1.03, letterbox: 0.08, bw: 0 },
     prefer: { brightness: 0.5, saturation: 0.3 },
-    textStyle: 'quote', textPool: 'quotes',
+    textStyle: 'quote', textPool: 'quotes', useTitles: false,
   },
   chaos: {
     label: 'chaos (nichetok)',
@@ -75,7 +75,7 @@ export const MODES = {
     black: { chance: 0.5, dur: [0.2, 0.6], silence: 0.5, text: 0.1 },
     fx: { grain: [0.1, 0.22], desat: 0.1, contrast: 1.15, letterbox: 0.3, bw: 0.1 },
     prefer: {},
-    textStyle: 'caption', textPool: 'captions',
+    textStyle: 'caption', textPool: 'captions', useTitles: true,
   },
   dwell: {
     label: 'dwell',
@@ -91,9 +91,21 @@ export const MODES = {
     black: { chance: 0.6, dur: [1, 3], silence: 0.4, text: 0 },
     fx: { grain: [0.05, 0.1], desat: 0.3, contrast: 1.05, letterbox: 0.25, bw: 0.12 },
     prefer: { motion: -0.3 },
-    textStyle: 'caption', textPool: 'captions',
+    textStyle: 'caption', textPool: 'captions', useTitles: true,
   },
 };
+
+// Found text: an archival title ("a date with your family", "design for dreaming") makes a better caption
+// than anything we could write. Lowercased, de-bracketed, trimmed to a line.
+export function cleanTitle(title) {
+  if (!title) return '';
+  let t = String(title).replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/[_|]+/g, ' ')
+    .replace(/\b(part|reel|pt\.?)\s*\d+\b/gi, ' ').replace(/\b(19|20)\d\d\b/g, ' ')
+    .replace(/[\s.,:;-]+$/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (t.length > 60) t = t.slice(0, 60).replace(/\s+\S*$/, '');
+  if (t.length < 4 || /^[\d\s]+$/.test(t)) return '';
+  return t;
+}
 
 export class Sequencer {
   constructor({ catalog, seed = 'corecore', mode = 'corecore' }) {
@@ -171,9 +183,14 @@ export class Sequencer {
     return this.rng.chance(fx.letterbox) ? this.rng.pick(['4:3', 'scope']) : null;
   }
 
-  maybeText(chance) {
+  maybeText(chance, clip = null) {
     if (!this.rng.chance(chance || 0)) return null;
-    const pool = this.customText.length ? this.customText : (this.params.textPool === 'quotes' ? QUOTES : CAPTIONS);
+    const custom = this.customText.length ? this.customText : null;
+    if (!custom && this.params.useTitles && clip && clip.source_title && this.rng.chance(0.5)) {
+      const t = cleanTitle(clip.source_title);
+      if (t) return { str: t, style: this.params.textStyle };
+    }
+    const pool = custom || (this.params.textPool === 'quotes' ? QUOTES : CAPTIONS);
     return { str: this.rng.pick(pool), style: this.params.textStyle };
   }
 
@@ -232,7 +249,7 @@ export class Sequencer {
         speed,
         zoom: zoomIn ? { from: 1.0, to: z } : { from: z, to: 1.0 },
         fx: { letterbox: lb, vignette: 0.5 },
-        text: this.maybeText(p.text),
+        text: this.maybeText(p.text, clip),
         fadeIn: p.fade || 0,
       }));
     }
@@ -352,7 +369,7 @@ export class Sequencer {
         grain: this.rng.range(0.1, 0.18),
         flash: this.rng.chance(0.3) ? { at: 'start', strength: 1 } : null,
       },
-      text: this.maybeText(p.text),
+      text: this.maybeText(p.text, clip),
       audio: { clip: 0, duck: 1 },
     })];
   }

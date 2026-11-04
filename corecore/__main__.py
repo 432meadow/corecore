@@ -25,6 +25,22 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--tags", "-t", default="", help="comma-separated tags, e.g. nature,archive")
 
     sub.add_parser("seed", help="queue the starter Internet Archive jobs")
+
+    p = sub.add_parser("export", help="write the player + a bounded slice of the pool as a static site")
+    p.add_argument("--out", default="site")
+    p.add_argument("--height", type=int, default=None, help="re-encode clips taller than this (default: copy as is)")
+    p.add_argument("--max-mb", type=float, default=450, dest="max_mb")
+    p.add_argument("--max-clips", type=int, default=2000, dest="max_clips")
+
+    p = sub.add_parser("build-site", help="scrape the starter list within a time budget, then export (what CI runs)")
+    p.add_argument("--out", default="site")
+    p.add_argument("--time-budget", type=float, default=1500, dest="time_budget", help="seconds of scraping before export")
+    p.add_argument("--height", type=int, default=None)
+    p.add_argument("--max-mb", type=float, default=450, dest="max_mb")
+    p.add_argument("--max-clips", type=int, default=2000, dest="max_clips")
+    p.add_argument("--skip-ingest", action="store_true", dest="skip_ingest")
+
+    sub.add_parser("tag-faces", help="(re)run face detection over the pool; needs opencv-python-headless")
     sub.add_parser("worker", help="run only the ingest worker (drain queued jobs)")
     sub.add_parser("stats", help="print pool statistics")
 
@@ -54,6 +70,30 @@ def main(argv: list[str] | None = None) -> int:
             jid = create_job(j["provider"], j.get("query"), j.get("url"), j.get("max_items", 5), j.get("tags"))
             print(f"queued job {jid}: {j['provider']} {j.get('query') or j.get('url')}")
         print("start `python -m corecore serve` (or `worker`) to run them")
+        return 0
+
+    if args.cmd in ("export", "build-site"):
+        from .export import export_site
+        if args.cmd == "build-site" and not args.skip_ingest:
+            from .jobs import run_starter_jobs
+            summary = run_starter_jobs(args.time_budget, echo=lambda m: print(f"  {m}"))
+            print(f"ingest: {summary}")
+        result = export_site(args.out, height=args.height, max_bytes=int(args.max_mb * 1024 * 1024), max_clips=args.max_clips)
+        print(result)
+        return 0
+
+    if args.cmd == "tag-faces":
+        from . import faces
+        if not faces.available():
+            print("opencv not available: pip install opencv-python-headless")
+            return 1
+        with db.connect() as conn:
+            rows = conn.execute("SELECT id, file, duration, tags FROM clips").fetchall()
+            for r in rows:
+                n = faces.faces_in_clip(config.MEDIA_DIR / r["file"], r["duration"] or 0)
+                tags = [t for t in db.tags_from_db(r["tags"]) if t != "faces"] + (["faces"] if n else [])
+                conn.execute("UPDATE clips SET faces = ?, tags = ? WHERE id = ?", (n, db.tags_to_db(tags), r["id"]))
+                print(f"clip {r['id']}: {n} face(s)")
         return 0
 
     if args.cmd == "worker":

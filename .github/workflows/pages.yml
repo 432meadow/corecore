@@ -1,0 +1,99 @@
+# Builds the static edition and publishes it to GitHub Pages.
+# The pipeline scrapes public-domain / open-licence footage from the Internet Archive on the runner,
+# cuts it into clips with ffmpeg, exports the player + manifest, and deploys. Runs weekly, on demand,
+# and when the app code changes. The clip pool is cached between runs so it grows over time.
+name: pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      time_budget:
+        description: seconds to spend scraping before exporting
+        default: "1500"
+      max_mb:
+        description: size budget of the exported site in MB
+        default: "450"
+  schedule:
+    - cron: "17 4 * * 1"
+  push:
+    branches: [main]
+    paths: ["corecore/**", "web/**", ".github/workflows/pages.yml", "requirements.txt"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: install ffmpeg
+        run: |
+          if ! command -v ffmpeg >/dev/null; then sudo apt-get update -q && sudo apt-get install -y -q ffmpeg; fi
+          ffmpeg -version | head -1
+
+      - name: install python deps
+        run: pip install -r requirements.txt "opencv-python-headless<5"
+
+      - name: restore clip pool from previous builds
+        uses: actions/cache/restore@v4
+        with:
+          path: media
+          key: corecore-media-${{ github.run_id }}
+          restore-keys: corecore-media-
+
+      - name: scrape, clip and export
+        env:
+          CORECORE_SEGMENT_HEIGHT: "540"
+          CORECORE_MAX_CLIPS_PER_SOURCE: "16"
+          CORECORE_MAX_SOURCE_BYTES: "250000000"
+          CORECORE_MAX_SOURCE_DURATION: "1500"
+          CORECORE_ARCHIVE_PREFER_SMALL: "1"
+        run: |
+          # rotate through result pages week by week so scheduled builds keep finding new material
+          export CORECORE_ARCHIVE_PAGE=$(( (10#$(date +%U) % 6) + 1 ))
+          echo "archive page $CORECORE_ARCHIVE_PAGE"
+          python -m corecore build-site --out site \
+            --time-budget "${{ github.event.inputs.time_budget || '1500' }}" \
+            --max-mb "${{ github.event.inputs.max_mb || '450' }}"
+          python -m corecore stats
+          du -sh site
+
+      - name: save clip pool for next build
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: media
+          key: corecore-media-${{ github.run_id }}
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+        continue-on-error: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

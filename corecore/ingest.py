@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Callable
 
-from . import config, db, ffmpeg
+from . import config, db, faces, ffmpeg
 from .providers import Candidate, get_provider
 
 log = logging.getLogger("corecore.ingest")
@@ -82,6 +82,7 @@ def ingest_candidate(cand: Candidate, tags: list[str], *, query: str = "", logge
                     ffmpeg.thumbnail(seg, min(0.5, max(0.0, seg_info["duration"] / 2)), thumb)
                     stats = ffmpeg.frame_stats(seg)
                     loud = ffmpeg.loudness(seg) if seg_info["has_audio"] else None
+                    n_faces = faces.faces_in_clip(seg, seg_info["duration"])
                 except ffmpeg.FFmpegError as e:
                     logger(f"clip {stem} failed: {e}")
                     for p in (seg, thumb):
@@ -89,12 +90,14 @@ def ingest_candidate(cand: Candidate, tags: list[str], *, query: str = "", logge
                             p.unlink()
                     continue
                 clip_tags = list(tags) + [cand.provider] + auto_tags(stats, seg_info, loud)
+                if n_faces:
+                    clip_tags.append("faces")
                 conn.execute(
                     "INSERT INTO clips (source_id, file, thumb, start, duration, width, height, has_audio, brightness, "
-                    "saturation, motion, loudness, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "saturation, motion, loudness, faces, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (source_id, f"segments/{seg.name}", f"thumbs/{thumb.name}", start, seg_info["duration"],
                      seg_info["width"], seg_info["height"], int(seg_info["has_audio"]), stats["brightness"],
-                     stats["saturation"], stats["motion"], loud, db.tags_to_db(clip_tags)))
+                     stats["saturation"], stats["motion"], loud, n_faces, db.tags_to_db(clip_tags)))
                 added += 1
             conn.execute("UPDATE sources SET status = 'done', duration = COALESCE(duration, ?) WHERE id = ?",
                          (info["duration"], source_id))

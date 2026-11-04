@@ -121,6 +121,16 @@ def cut_segment(src: Path | str, start: float, length: float, out: Path | str, *
     _run(args, timeout=600, capture_stdout=False)
 
 
+def transcode(src: Path | str, out: Path | str, *, height: int, crf: int = 27, has_audio: bool = True) -> None:
+    """Re-encode an existing clip at a smaller height (used by the static exporter)."""
+    args = [config.FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-nostats", "-i", str(src),
+            "-vf", f"scale=-2:{height}", "-c:v", "libx264", "-preset", "veryfast", "-crf", str(crf),
+            "-pix_fmt", "yuv420p", "-profile:v", "main", "-movflags", "+faststart"]
+    args += ["-c:a", "aac", "-b:a", "80k", "-ac", "2"] if has_audio else ["-an"]
+    args += [str(out)]
+    _run(args, timeout=600, capture_stdout=False)
+
+
 def thumbnail(src: Path | str, t: float, out: Path | str, width: int = 320) -> None:
     _run([config.FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-nostats", "-ss", f"{t:.3f}", "-i", str(src),
           "-frames:v", "1", "-vf", f"scale={width}:-2", "-q:v", "4", str(out)], timeout=120, capture_stdout=False)

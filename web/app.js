@@ -1,5 +1,5 @@
 import { AudioEngine } from './audio.js';
-import { Catalog } from './catalog.js';
+import { Catalog, StaticCatalog } from './catalog.js';
 import { Player } from './player.js';
 import { Recorder } from './recorder.js';
 import { MODES, Sequencer } from './sequencer.js';
@@ -7,9 +7,18 @@ import { makeRng, seedToInt } from './prng.js';
 
 const $ = (sel) => document.querySelector(sel);
 const params = new URLSearchParams(location.search);
+const STATIC = window.CORECORE_STATIC || null;   // set by the exported index.html: path of manifest.json
+
+// The live channel: the seed is derived from the clock in 10-minute windows and every viewer
+// fast-forwards to the same point, so everybody watches the same edit at the same moment.
+const LIVE_WINDOW_MS = 10 * 60 * 1000;
+const liveSeed = () => `live-${Math.floor(Date.now() / LIVE_WINDOW_MS)}`;
+const liveElapsed = () => (Date.now() % LIVE_WINDOW_MS) / 1000;
+const randomSeed = () => Math.random().toString(36).slice(2, 8);
 
 const state = {
-  seed: params.get('seed') || Math.random().toString(36).slice(2, 8),
+  live: params.get('seed') === 'live',
+  seed: params.get('seed') === 'live' ? liveSeed() : (params.get('seed') || randomSeed()),
   mode: MODES[params.get('mode')] ? params.get('mode') : 'corecore',
   aspect: ['16:9', '9:16', '1:1'].includes(params.get('aspect')) ? params.get('aspect') : '16:9',
   music: params.get('music') || 'generated',
@@ -18,7 +27,7 @@ const state = {
 };
 
 const audio = new AudioEngine();
-const catalog = new Catalog({ seed: seedToInt(state.seed) });
+const catalog = STATIC ? new StaticCatalog({ seed: seedToInt(state.seed), manifestUrl: STATIC }) : new Catalog({ seed: seedToInt(state.seed) });
 const sequencer = new Sequencer({ catalog, seed: state.seed, mode: state.mode });
 const canvas = $('#stage');
 const player = new Player({ canvas, audio, catalog, sequencer, videoHost: $('#videos') });
@@ -37,7 +46,7 @@ function toast(msg, ms = 2200) {
 }
 
 function syncUrl() {
-  const p = new URLSearchParams({ seed: state.seed, mode: state.mode, aspect: state.aspect, music: state.music });
+  const p = new URLSearchParams({ seed: state.live ? 'live' : state.seed, mode: state.mode, aspect: state.aspect, music: state.music });
   if (state.slowed) p.set('slowed', '1');
   history.replaceState(null, '', `?${p}`);
 }
@@ -59,9 +68,15 @@ async function fillMusic() {
   const sel = $('#music');
   sel.innerHTML = '<option value="generated">generated ambient (built in)</option>';
   try {
-    const r = await fetch('/api/music');
-    const j = await r.json();
-    for (const t of j.tracks) {
+    let tracks = [];
+    if (STATIC) {
+      await catalog.load();
+      tracks = (catalog.manifest.music || []).map((t) => ({ name: t.name, url: STATIC.replace(/[^/]*$/, '') + t.url }));
+    } else {
+      const r = await fetch('api/music');
+      tracks = (await r.json()).tracks;
+    }
+    for (const t of tracks) {
       const o = document.createElement('option');
       o.value = t.url;
       o.textContent = t.name;
@@ -99,17 +114,25 @@ function setMode(name) {
   toast(`mode: ${MODES[name].label}`);
 }
 
-function setSeed(seed) {
+function setSeed(seed, { live = false } = {}) {
+  state.live = live;
   state.seed = seed;
-  $('#seed').value = seed;
+  $('#seed').value = live ? 'live' : seed;
   sequencer.reseed(seed);
   catalog.seed = seedToInt(seed);
+  player.snapEnabled = !live;
   if (state.started) {
-    player.flush();
+    player.restart(live ? liveElapsed() : 0);
     if (state.music === 'generated') applyMusic();
   }
   syncUrl();
-  toast(`seed: ${seed}`);
+  toast(live ? 'live channel: everyone sees this edit right now' : `seed: ${seed}`);
+}
+
+function goLive() { setSeed(liveSeed(), { live: true }); }
+
+function checkLive() {
+  if (state.live && state.started && liveSeed() !== state.seed) setSeed(liveSeed(), { live: true });
 }
 
 function setAspect(a) {
@@ -126,14 +149,39 @@ async function refreshStats() {
     $('#stats').textContent = `${s.clips} clips · ${s.sources} sources · ${Math.round(s.seconds / 60)} min · ${s.with_audio} with audio`;
     $('#tags').textContent = tags || 'no tags yet';
     $('#empty').classList.toggle('hidden', s.clips > 0);
+    if (STATIC && catalog.manifest && !$('#credits').dataset.filled) fillCredits();
   } catch (e) {
-    $('#stats').textContent = 'server unreachable';
+    $('#stats').textContent = STATIC ? 'could not load manifest.json' : 'server unreachable';
   }
 }
 
+function fillCredits() {
+  const m = catalog.manifest;
+  const built = m.built_at ? new Date(m.built_at).toLocaleDateString() : '';
+  $('#staticNote').textContent = `static edition built ${built}: ${m.clips.length} clips from ${m.sources.length} public-domain and open-licence sources, re-scraped by the build pipeline. run it locally to scrape your own.`;
+  $('#staticNote').classList.remove('hidden');
+  const ul = $('#credits ul');
+  ul.innerHTML = '';
+  for (const s of m.sources) {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = s.url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = s.title || s.url;
+    li.appendChild(a);
+    if (s.uploader) li.appendChild(document.createTextNode(` · ${s.uploader}`));
+    if (s.license) li.appendChild(document.createTextNode(` · ${s.license.replace(/^https?:\/\/(www\.)?/, '')}`));
+    ul.appendChild(li);
+  }
+  $('#credits').classList.remove('hidden');
+  $('#credits').dataset.filled = '1';
+}
+
 async function refreshJobs() {
+  if (STATIC) return;
   try {
-    const r = await fetch('/api/jobs?limit=12');
+    const r = await fetch('api/jobs?limit=12');
     const j = await r.json();
     const list = $('#jobs');
     list.innerHTML = '';
@@ -168,7 +216,7 @@ async function submitJob(ev) {
     max_items: Number($('#maxItems').value) || 5,
     tags: $('#jobTags').value,
   };
-  const r = await fetch('/api/jobs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await fetch('api/jobs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json();
   toast(r.ok ? `queued job #${j.id}` : `error: ${j.detail || r.status}`);
   if (r.ok) $('#query').value = '';
@@ -176,7 +224,7 @@ async function submitJob(ev) {
 }
 
 async function seedStarter() {
-  const r = await fetch('/api/seed', { method: 'POST' });
+  const r = await fetch('api/seed', { method: 'POST' });
   const j = await r.json();
   toast(`queued ${j.queued.length} starter jobs (Internet Archive)`);
   refreshJobs();
@@ -209,15 +257,17 @@ async function start() {
   audio.onOnset((s) => player.onOnset(s));
   await applyMusic();
   await refreshStats();
-  await player.start();
+  player.snapEnabled = !state.live;
+  await player.start({ fastForward: state.live ? liveElapsed() : 0 });
 }
 
 // ---- wiring ---------------------------------------------------------------------------------
 
 function wire() {
+  if (STATIC) document.body.classList.add('static');
   fillModes();
   fillMusic();
-  $('#seed').value = state.seed;
+  $('#seed').value = state.live ? 'live' : state.seed;
   $('#aspect').value = state.aspect;
   $('#slowed').checked = state.slowed;
   player.setAspect(state.aspect);
@@ -227,8 +277,9 @@ function wire() {
   $('#splash').addEventListener('click', (e) => { if (e.target.id !== 'start') start(); });
   $('#mode').addEventListener('change', (e) => setMode(e.target.value));
   $('#aspect').addEventListener('change', (e) => setAspect(e.target.value));
-  $('#reseed').addEventListener('click', () => setSeed(Math.random().toString(36).slice(2, 8)));
-  $('#seed').addEventListener('change', (e) => setSeed(e.target.value.trim() || 'corecore'));
+  $('#reseed').addEventListener('click', () => setSeed(randomSeed()));
+  $('#live').addEventListener('click', goLive);
+  $('#seed').addEventListener('change', (e) => { const v = e.target.value.trim(); v === 'live' ? goLive() : setSeed(v || 'corecore'); });
   $('#music').addEventListener('change', (e) => { state.music = e.target.value; syncUrl(); applyMusic(); });
   $('#slowed').addEventListener('change', (e) => { state.slowed = e.target.checked; syncUrl(); if (audio.mode === 'file') audio.setSlowed(state.slowed); });
   $('#volume').addEventListener('input', (e) => audio.setVolume(Number(e.target.value)));
@@ -250,7 +301,7 @@ function wire() {
   $('#seedStarter').addEventListener('click', seedStarter);
   $('#jobs').addEventListener('click', async (e) => {
     const id = e.target.dataset.cancel;
-    if (id) { await fetch(`/api/jobs/${id}/cancel`, { method: 'POST' }); refreshJobs(); }
+    if (id) { await fetch(`api/jobs/${id}/cancel`, { method: 'POST' }); refreshJobs(); }
   });
   $('#copyLink').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(location.href); toast('link copied'); } catch (e) { toast(location.href, 5000); }
@@ -275,7 +326,8 @@ function wire() {
     else if (k === 'i') player.showInfo = !player.showInfo;
     else if (k === 'f') toggleFullscreen();
     else if (k === 'r') toggleRecord();
-    else if (k === 's') setSeed(Math.random().toString(36).slice(2, 8));
+    else if (k === 's') setSeed(randomSeed());
+    else if (k === 'l') goLive();
     else if (k === 'x') player.banCurrent().then((id) => id && toast(`banned clip #${id}`));
     else if (k === 'v') setAspect(state.aspect === '16:9' ? '9:16' : '16:9');
     else if (k === 'm') { const keys = Object.keys(MODES); setMode(keys[(keys.indexOf(state.mode) + 1) % keys.length]); }
@@ -285,6 +337,7 @@ function wire() {
   refreshJobs();
   setInterval(refreshJobs, 2500);
   setInterval(refreshStats, 15000);
+  setInterval(checkLive, 5000);
 }
 
 wire();

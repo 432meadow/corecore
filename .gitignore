@@ -1,5 +1,6 @@
 media/*
 !media/.gitkeep
+site/
 __pycache__/
 *.pyc
 .venv/

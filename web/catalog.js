@@ -1,4 +1,6 @@
 // The client-side clip pool: a sampled window onto the server's catalogue, with feature-aware picking.
+// StaticCatalog (below) is the same thing fed by an exported manifest.json, for static hosting.
+import { makeRng } from './prng.js';
 export class Catalog {
   constructor({ seed = null } = {}) {
     this.seed = seed;
@@ -13,7 +15,7 @@ export class Catalog {
   get size() { return this.pool.length; }
 
   async refreshStats() {
-    const r = await fetch('/api/stats');
+    const r = await fetch('api/stats');
     this.stats = await r.json();
     return this.stats;
   }
@@ -41,7 +43,7 @@ export class Catalog {
   async fetchInto(n, exclude) {
     const params = new URLSearchParams({ n: String(n), exclude: exclude.join(',') });
     if (this.seed != null) params.set('seed', String((this.seed + this.generation++) >>> 0));
-    const r = await fetch(`/api/clips/sample?${params}`);
+    const r = await fetch(`api/clips/sample?${params}`);
     if (!r.ok) throw new Error(`sample failed: ${r.status}`);
     const j = await r.json();
     const have = new Set(this.pool.map((c) => c.id));
@@ -101,6 +103,94 @@ export class Catalog {
 
   async ban(id) {
     this.markBad(id);
-    await fetch(`/api/clips/${id}/ban`, { method: 'POST' });
+    await fetch(`api/clips/${id}/ban`, { method: 'POST' });
+  }
+}
+
+export function computeStats(clips) {
+  const tags = {};
+  const sources = new Set();
+  let withAudio = 0;
+  let seconds = 0;
+  for (const c of clips) {
+    sources.add(c.source_id);
+    if (c.has_audio) withAudio++;
+    seconds += c.duration || 0;
+    for (const t of c.tags || []) tags[t] = (tags[t] || 0) + 1;
+  }
+  const sorted = Object.fromEntries(Object.entries(tags).sort((a, b) => b[1] - a[1]));
+  return { clips: clips.length, banned: 0, sources: sources.size, seconds: Math.round(seconds * 10) / 10, with_audio: withAudio, tags: sorted };
+}
+
+// Static edition: the whole pool is in memory, picks are deterministic for a given seed and sequence of
+// calls (no timing-dependent refills), which is what makes the synchronized live channel possible.
+export class StaticCatalog extends Catalog {
+  constructor({ seed = null, manifestUrl = 'manifest.json' } = {}) {
+    super({ seed });
+    this.manifestUrl = manifestUrl;
+    this.all = null;
+    this.manifest = null;
+  }
+
+  get size() { return this.all ? this.all.length - this.bad.size : 0; }
+
+  async load() {
+    if (this.all) return this.all;
+    const r = await fetch(this.manifestUrl, { cache: 'no-cache' });
+    if (!r.ok) throw new Error(`manifest ${r.status}`);
+    const m = await r.json();
+    const base = this.manifestUrl.replace(/[^/]*$/, '');
+    const sources = new Map((m.sources || []).map((s) => [s.id, s]));
+    this.all = (m.clips || []).map((c) => {
+      const s = sources.get(c.source_id) || {};
+      return {
+        ...c,
+        tags: c.tags || [],
+        url: base + c.file,
+        thumb_url: c.thumb ? base + c.thumb : null,
+        source_title: s.title || '',
+        source_uploader: s.uploader || '',
+        source_url: s.url || '',
+        provider: s.provider || '',
+        license: s.license || '',
+      };
+    });
+    this.manifest = m;
+    try {
+      for (const id of JSON.parse(localStorage.getItem('corecore.banned') || '[]')) this.bad.add(id);
+    } catch (e) { /* no storage */ }
+    this.recomputeStats();
+    return this.all;
+  }
+
+  recomputeStats() {
+    this.stats = computeStats(this.all.filter((c) => !this.bad.has(c.id)));
+  }
+
+  async refreshStats() { await this.load(); return this.stats; }
+  async ensure() { await this.load(); }
+  async fill() { await this.load(); return this.size; }
+
+  recentCap() {
+    const total = this.stats.clips || 0;
+    return Math.max(8, Math.min(300, Math.floor(total * 0.5)));
+  }
+
+  take(filter = {}, rng) {
+    if (!this.all) return null;
+    const recent = new Set(this.recent.slice(-this.recentCap()));
+    let cands = this.all.filter((c) => !this.bad.has(c.id) && !recent.has(c.id));
+    if (!cands.length) cands = this.all.filter((c) => !this.bad.has(c.id));
+    if (!cands.length) return null;
+    const pick = rng ? rng.weighted(cands, (c) => this.score(c, filter)) : cands[0];
+    this.recent.push(pick.id);
+    if (this.recent.length > 600) this.recent.splice(0, 300);
+    return pick;
+  }
+
+  async ban(id) {
+    this.markBad(id);
+    if (this.all) this.recomputeStats();
+    try { localStorage.setItem('corecore.banned', JSON.stringify([...this.bad])); } catch (e) { /* no storage */ }
   }
 }

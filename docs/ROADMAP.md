@@ -8,7 +8,8 @@ Rough order of usefulness. Nothing here is started.
   contrast pairs work on any pool without hand tags. Store the embedding so the sequencer can also pick
   "visually similar" or "maximally different" follow-ups.
 - **Speech detection** (a VAD such as Silero, or whisper-tiny) so `voice` phrases find real talking heads,
-  and so captions can quote what is being said, which is a strong corecore device.
+  and so captions can quote what is being said, which is a strong corecore device. (Face tagging with a
+  Haar cascade is in; a modern detector would cut the false positives on grainy film.)
 - **More providers**: Pexels / Pixabay / Coverr APIs (free stock, API key), Wikimedia Commons, Vimeo
   CC search, TikTok via yt-dlp URL lists, RSS of news clips.
 - **Shot quality filter**: drop near-black, near-static or slate/title-card shots; dedupe near-identical
@@ -29,8 +30,8 @@ Rough order of usefulness. Nothing here is started.
 - **Server-side render**: the client already produces a deterministic edit decision list per seed. Post it
   to an endpoint that renders the same list with ffmpeg (concat + zoompan + noise + vignette) to an mp4,
   for sharing without screen recording. WebM from the in-browser recorder is the stopgap.
-- **HLS / WebRTC "channel"**: render continuously on the server and let any number of viewers watch the
-  same infinite stream in sync.
+- **HLS / WebRTC "channel"**: the static live channel syncs viewers by clock and deterministic sequencing;
+  a server-rendered stream would make the sync exact and allow music with real transients.
 - **Vertical export presets** (TikTok, Reels, Shorts safe areas).
 
 ## Operations

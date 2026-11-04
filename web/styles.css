@@ -46,3 +46,11 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); f
 #jobs .pct { color: #ccc; }
 #jobs button { padding: 1px 6px; font-size: 10px; }
 code { color: #ccc; }
+
+body.static #ingest { display: none; }
+#credits { margin: 8px 0; color: var(--dim); font-size: 11px; }
+#credits summary { cursor: pointer; }
+#credits ul { padding-left: 14px; margin: 6px 0; max-height: 220px; overflow-y: auto; }
+#credits a { color: #bbb; }
+.foot { margin-top: 20px; font-size: 11px; }
+.foot a { color: var(--dim); }

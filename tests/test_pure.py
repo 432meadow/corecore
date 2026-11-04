@@ -1,6 +1,7 @@
 """Unit tests for the parts that need no network. Run: python -m unittest discover -s tests -v"""
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import tempfile
@@ -119,3 +120,74 @@ class FfmpegRoundTrip(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExportTest(unittest.TestCase):
+    def test_select_clips_round_robin_and_budget(self):
+        from corecore.export import select_clips
+        with tempfile.TemporaryDirectory() as d:
+            media = Path(d)
+            (media / "segments").mkdir()
+            rows = []
+            for sid in (1, 2, 3):
+                for i in range(4):
+                    f = f"segments/{sid}_{i}.mp4"
+                    (media / f).write_bytes(b"x" * 100)
+                    rows.append({"id": sid * 10 + i, "source_id": sid, "file": f, "start": i})
+            chosen, total = select_clips(rows, media, max_bytes=650, max_clips=100)
+            self.assertEqual(len(chosen), 6)
+            self.assertEqual(total, 600)
+            self.assertEqual(sorted({r["source_id"] for r in chosen}), [1, 2, 3])  # spread across sources
+            chosen, _ = select_clips(rows, media, max_bytes=10 ** 9, max_clips=5)
+            self.assertEqual(len(chosen), 5)
+
+    def test_export_site_writes_manifest(self):
+        from corecore.export import export_site
+        db.init()
+        with db.connect() as conn:
+            conn.execute("DELETE FROM sources")
+            conn.execute("INSERT INTO sources (provider, external_id, url, title, status, tags) VALUES "
+                         "('local', 'exp', 'file:///x', 'Design for Dreaming (1956)', 'done', ',archive,ads,')")
+            sid = conn.execute("SELECT id FROM sources WHERE external_id = 'exp'").fetchone()["id"]
+            seg = config.SEGMENTS_DIR / "exp_000.mp4"
+            subprocess.run([config.FFMPEG, "-y", "-loglevel", "error", "-t", "1", "-f", "lavfi", "-i", "testsrc=s=160x90:r=10",
+                            "-c:v", "libx264", "-preset", "ultrafast", str(seg)], check=True)
+            conn.execute("INSERT INTO clips (source_id, file, thumb, duration, width, height, has_audio, tags) VALUES "
+                         "(?, 'segments/exp_000.mp4', NULL, 1.0, 160, 90, 0, ',archive,ads,bright,')", (sid,))
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "site"
+            summary = export_site(out, log=lambda m: None)
+            self.assertEqual(summary["clips"], 1)
+            manifest = json.loads((out / "manifest.json").read_text())
+            self.assertEqual(manifest["sources"][0]["title"], "Design for Dreaming (1956)")
+            self.assertEqual(manifest["clips"][0]["file"], "clips/exp_000.mp4")
+            self.assertTrue((out / "clips" / "exp_000.mp4").exists())
+            self.assertTrue((out / "web" / "app.js").exists())
+            self.assertIn('window.CORECORE_STATIC = "manifest.json"', (out / "index.html").read_text())
+            self.assertTrue((out / ".nojekyll").exists())
+        with db.connect() as conn:
+            conn.execute("DELETE FROM sources")
+
+
+class StarterBudgetTest(unittest.TestCase):
+    def test_run_starter_jobs_respects_time_budget(self):
+        from corecore import jobs, seeds
+        db.init()
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "tiny.mp4"
+            subprocess.run([config.FFMPEG, "-y", "-loglevel", "error", "-t", "3", "-f", "lavfi", "-i", "testsrc2=s=160x90:r=10",
+                            "-c:v", "libx264", "-preset", "ultrafast", str(src)], check=True)
+            original = seeds.STARTER_JOBS
+            seeds.STARTER_JOBS = [{"provider": "local", "url": str(src), "max_items": 1, "tags": ["t"]}]
+            try:
+                none = jobs.run_starter_jobs(time_budget=0)
+                self.assertEqual(none["jobs"], 0)
+                self.assertTrue(none["stopped_early"])
+                done = jobs.run_starter_jobs(time_budget=120)
+                self.assertEqual(done["jobs"], 1)
+                self.assertGreaterEqual(done["clips"], 1)
+            finally:
+                seeds.STARTER_JOBS = original
+                with db.connect() as conn:
+                    conn.execute("DELETE FROM sources")
+                    conn.execute("DELETE FROM jobs")

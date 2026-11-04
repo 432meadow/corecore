@@ -5,6 +5,10 @@ Archive, anything yt-dlp can reach, or your own files), chops it into shots, and
 shots into an infinite stream: slow sad set-up, accelerating cuts, a burst of blisteringly fast ones, a
 held image, a cut to black. Over and over, never the same twice, reproducible by seed.
 
+**Watch it:** https://432meadow.github.io/corecore/ is the static edition, rebuilt weekly by CI from
+public-domain footage on the Internet Archive. Add `?seed=live` and you are on the live channel: everyone
+on that URL sees the same edit at the same moment.
+
 What the genre is and which of its conventions the generator encodes: [docs/CORECORE.md](docs/CORECORE.md).
 Where this is going next: [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -39,6 +43,21 @@ python -m corecore ingest --provider local --url ~/Videos/holiday --tags home,ch
 Drop music into `media/music/` (mp3, ogg, wav, m4a, flac) and it shows up in the music menu, with an
 optional slowed + reverb treatment. With no music of your own, a built-in generative ambient bed plays.
 
+## Two editions
+
+| | full app | static edition (GitHub Pages) |
+| --- | --- | --- |
+| runs | `python -m corecore serve` on your machine | any static host; CI builds it |
+| footage | whatever you scrape or drop in, unlimited | a bounded slice of the pool (default 450 MB) exported with `python -m corecore export` |
+| scraping | from the browser or the CLI, any provider | done by the GitHub Actions workflow from the Internet Archive, cached between runs so the pool grows |
+| music | your tracks in `media/music/` + generated bed | generated bed (+ any tracks exported with the site) |
+| curation | ban clips for everyone | ban clips for yourself (localStorage) |
+
+The static edition is the same player: `index.html` just carries `window.CORECORE_STATIC = "manifest.json"`
+and the catalogue reads the manifest instead of the API. `.github/workflows/pages.yml` does the rest:
+scrape within a time budget, clip, export, deploy. Trigger it by hand from the Actions tab (inputs: time
+budget and size budget), or let the Monday schedule run.
+
 ## How it works
 
 ```
@@ -63,6 +82,14 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   lets strong music onsets pull a cut forward.
 - **Modes**: `corecore` (default), `hopecore` (warmer, quotes, no cut to black), `chaos` (the 2023
   nichetok turn: layered, random speeds), `dwell` (long takes only).
+- **Found text**: captions are drawn half the time from the source's own title ("a date with your
+  family", "design for dreaming"), the rest from a small built-in pool or your own lines.
+- **Faces**: with `opencv-python-headless<5` installed, clips get a `faces` tag from a Haar cascade run
+  on three frames, and the sequencer prefers them for motifs and climaxes.
+- **Live channel** (`?seed=live`, key `l`): the seed is derived from the clock in 10-minute windows and a
+  joining viewer fast-forwards through the deterministic cue stream to the current position. Beat
+  snapping is off in this mode so every viewer's cuts stay aligned (within a cut or two; stalls resync at
+  the next window).
 
 ## Controls
 
@@ -76,6 +103,7 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 | f | fullscreen |
 | r | start / stop recording (downloads a WebM of what you saw and heard) |
 | s | new seed |
+| l | live channel |
 | m | next mode |
 | v | toggle 16:9 / 9:16 |
 | x | ban the current clip (removed from the pool for good) |
@@ -100,6 +128,16 @@ pool. "copy link" in the controls does that for you.
 Sources that fail (no mp4 derivative, too long, download error) are recorded with the error in `/api/sources`
 and skipped; the job carries on.
 
+## Deploying
+
+- **GitHub Pages**: push to `main` (or run the `pages` workflow). One-time setup in the repository
+  settings: Pages → Source → "GitHub Actions". The workflow needs the repository to be public, or a
+  plan that allows private Pages.
+- **Full app in Docker**: `docker build -t corecore . && docker run -p 8000:8000 -v corecore-media:/app/media corecore`.
+  Put a reverse proxy with auth in front before exposing the ingest form to the internet: the local
+  provider reads paths on the server and yt-dlp fetches whatever URL it is given.
+- **Static export anywhere**: `python -m corecore export --out site --max-mb 450` and upload `site/`.
+
 ## Configuration
 
 Environment variables, all optional:
@@ -116,6 +154,8 @@ Environment variables, all optional:
 | `CORECORE_MAX_SOURCE_BYTES` | 600 MB | skip or abort larger downloads |
 | `CORECORE_KEEP_SOURCES` | 0 | keep downloaded originals in `media/sources/` |
 | `CORECORE_NO_WORKER` | unset | `1` disables the in-process worker (run `python -m corecore worker` elsewhere) |
+| `CORECORE_ARCHIVE_PREFER_SMALL` | 0 | `1` prefers the 512 kb/s Internet Archive derivative (faster builds) |
+| `CORECORE_ARCHIVE_PAGE` | 1 | which page of Internet Archive results to take (CI rotates it weekly) |
 | `YTDLP_COOKIES_FROM_BROWSER`, `YTDLP_COOKIES_FILE`, `YTDLP_MAX_HEIGHT` | | yt-dlp options |
 
 ## API
@@ -138,15 +178,18 @@ Environment variables, all optional:
 python -m unittest discover -s tests -v
 ```
 
-Pure-function tests plus a short ffmpeg round trip on synthetic footage. The providers that need the
-network are exercised against fixtures only.
+Pure-function tests, the exporter, the CI budget runner and a short ffmpeg round trip on synthetic footage.
+The providers that need the network are exercised against fixtures only; the real test of the Internet
+Archive provider is the `pages` workflow log.
 
 ## Layout
 
 ```
-corecore/            backend package (config, db, ffmpeg, ingest, jobs, app, providers/, seeds, CLI)
+corecore/            backend package (config, db, ffmpeg, ingest, faces, export, jobs, app, providers/, seeds, CLI)
 web/                 the player: index.html, app.js, player.js, sequencer.js, audio.js, catalog.js, prng.js, recorder.js
+.github/workflows/   pages.yml (scrape + export + deploy), tests.yml
 docs/                CORECORE.md (research + rules), ROADMAP.md
 tests/               unit tests
 media/               created at runtime: segments/, thumbs/, music/, inbox/, sources/, corecore.sqlite3 (git-ignored)
+site/                output of `export` / `build-site` (git-ignored)
 ```

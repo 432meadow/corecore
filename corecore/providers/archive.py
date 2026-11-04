@@ -3,6 +3,7 @@ NASA, newsreels, old commercials, community uploads. The most dependable *and* m
 from __future__ import annotations
 
 import json
+import os
 import re
 import urllib.parse
 import urllib.request
@@ -17,6 +18,7 @@ DOWNLOAD_URL = "https://archive.org/download/"
 
 # Derivative formats in order of preference. Everything here is an .mp4 that browsers and ffmpeg both like.
 PREFERRED_FORMATS = ["h.264 IA", "h.264", "512Kb MPEG4", "MPEG4", "HiRes MPEG4", "h.264 HD", "MPEG4 (H.264)"]
+SMALL_FIRST = ["512Kb MPEG4", "h.264 IA", "h.264", "MPEG4", "MPEG4 (H.264)", "HiRes MPEG4", "h.264 HD"]
 _DETAILS_RE = re.compile(r"archive\.org/(?:details|download|embed)/([^/?#]+)")
 
 
@@ -45,8 +47,12 @@ def _first(v):
     return v[0] if isinstance(v, list) and v else v
 
 
-def choose_file(files: list[dict]) -> dict | None:
-    """Pick the best mp4 derivative from an item's file list."""
+def choose_file(files: list[dict], prefer_small: bool | None = None) -> dict | None:
+    """Pick the best mp4 derivative from an item's file list. CORECORE_ARCHIVE_PREFER_SMALL=1 favours the
+    512 kb/s derivative, which downloads several times faster and is plenty for a 540p clip pool."""
+    if prefer_small is None:
+        prefer_small = os.environ.get("CORECORE_ARCHIVE_PREFER_SMALL", "0") == "1"
+    order = SMALL_FIRST if prefer_small else PREFERRED_FORMATS
     best = None
     best_key = None
     for f in files:
@@ -60,7 +66,7 @@ def choose_file(files: list[dict]) -> dict | None:
             size = 0
         if size and size > config.MAX_SOURCE_BYTES:
             continue
-        rank = PREFERRED_FORMATS.index(fmt) if fmt in PREFERRED_FORMATS else len(PREFERRED_FORMATS)
+        rank = order.index(fmt) if fmt in order else len(order)
         # prefer the preferred format, then the smaller file (we re-encode to 720p anyway)
         key = (rank, size or 10 ** 12)
         if best_key is None or key < best_key:
@@ -85,8 +91,9 @@ class ArchiveProvider(Provider):
         if not query:
             raise ProviderError("archive provider needs a query or an item URL")
         q = query if "mediatype:" in query else f"({query}) AND mediatype:movies"
-        params = [("q", q), ("rows", str(max(1, max_items * 3))), ("page", "1"), ("output", "json"),
-                  ("sort[]", "downloads desc")]
+        page = os.environ.get("CORECORE_ARCHIVE_PAGE", "1")  # rotate pages across scheduled builds for fresh material
+        params = [("q", q), ("rows", str(max(1, max_items * 3))), ("page", page if page.isdigit() else "1"),
+                  ("output", "json"), ("sort[]", "downloads desc")]
         for fl in ("identifier", "title", "creator", "licenseurl", "runtime"):
             params.append(("fl[]", fl))
         data = _get_json(SEARCH_URL + "?" + urllib.parse.urlencode(params))

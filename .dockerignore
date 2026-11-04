@@ -1,0 +1,7 @@
+media/
+site/
+.git/
+__pycache__/
+*.pyc
+.venv/
+*.webm

@@ -33,7 +33,9 @@ def _status(job_id: int) -> str | None:
         return row["status"] if row else None
 
 
-def run_job(job_id: int, echo: Callable[[str], None] | None = None) -> None:
+def run_job(job_id: int, echo: Callable[[str], None] | None = None, deadline: float | None = None) -> None:
+    """Run one job to completion. `deadline` is a time.monotonic() value after which the job stops early
+    (it is then marked done with whatever it managed, which is what a CI build wants)."""
     with db.connect() as conn:
         job = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
     if job is None:
@@ -45,8 +47,11 @@ def run_job(job_id: int, echo: Callable[[str], None] | None = None) -> None:
             echo(msg)
         _update(job_id, message=msg[:300])
 
+    def out_of_time() -> bool:
+        return deadline is not None and time.monotonic() > deadline
+
     def cancelled() -> bool:
-        return _status(job_id) == "cancelled"
+        return out_of_time() or _status(job_id) == "cancelled"
 
     _update(job_id, status="running", progress=0.0, message="searching")
     tags = db.tags_from_db(job["tags"])
@@ -63,6 +68,9 @@ def run_job(job_id: int, echo: Callable[[str], None] | None = None) -> None:
     logger(f"{len(cands)} candidate(s)")
     added = 0
     for i, cand in enumerate(cands):
+        if out_of_time():
+            _update(job_id, status="done", clips_added=added, message=f"stopped at time budget: {added} clips added")
+            return
         if cancelled():
             _update(job_id, message="cancelled")
             return
@@ -72,10 +80,34 @@ def run_job(job_id: int, echo: Callable[[str], None] | None = None) -> None:
         except Exception as e:  # noqa: BLE001
             logger(f"error: {e}")
         _update(job_id, progress=(i + 1) / len(cands), clips_added=added)
+    if out_of_time():
+        _update(job_id, status="done", clips_added=added, message=f"stopped at time budget: {added} clips added")
+        return
     if cancelled():
         _update(job_id, message="cancelled")
         return
     _update(job_id, status="done", progress=1.0, clips_added=added, message=f"done: {added} clips added")
+
+
+def run_starter_jobs(time_budget: float, echo: Callable[[str], None] | None = None) -> dict:
+    """Run the curated starter list in the foreground within a time budget (used by `build-site` and CI)."""
+    from .seeds import STARTER_JOBS
+
+    deadline = time.monotonic() + time_budget
+    summary = {"jobs": 0, "clips": 0, "stopped_early": False}
+    for j in STARTER_JOBS:
+        if time.monotonic() > deadline:
+            summary["stopped_early"] = True
+            break
+        job_id = create_job(j["provider"], j.get("query"), j.get("url"), j.get("max_items", 5), j.get("tags"))
+        if echo:
+            echo(f"job {job_id}: {j['provider']} {j.get('query') or j.get('url')}")
+        run_job(job_id, echo=echo, deadline=deadline)
+        with db.connect() as conn:
+            row = conn.execute("SELECT clips_added FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        summary["jobs"] += 1
+        summary["clips"] += int(row["clips_added"] or 0)
+    return summary
 
 
 def claim_next() -> int | None:

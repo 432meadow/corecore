@@ -4,7 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>corecore</title>
-  <link rel="stylesheet" href="/web/styles.css">
+  <meta name="description" content="An endless found-footage montage in the corecore aesthetic. Public-domain footage, re-edited forever in your browser.">
+  <meta property="og:title" content="corecore">
+  <meta property="og:description" content="An endless found-footage montage. Slow, sad, then too fast. Sound on.">
+  <meta property="og:type" content="website">
+  <link rel="stylesheet" href="web/styles.css">
 </head>
 <body>
   <canvas id="stage" width="1280" height="720"></canvas>
@@ -15,7 +19,7 @@
       <h1>corecore</h1>
       <p>an endless found-footage montage. sound on.</p>
       <button id="start">start</button>
-      <p class="hint">space pause · n next phrase · h controls · i info · f fullscreen · r record · s reseed · m mode · v vertical · x ban clip</p>
+      <p class="hint">space pause · n next phrase · h controls · i info · f fullscreen · r record · s reseed · l live channel · m mode · v vertical · x ban clip</p>
     </div>
   </div>
 
@@ -32,7 +36,7 @@
       <h2>stream</h2>
       <label>mode <select id="mode"></select></label>
       <div id="modeBlurb" class="blurb"></div>
-      <label>seed <input id="seed" size="10"> <button id="reseed" type="button">new</button></label>
+      <label>seed <input id="seed" size="10"> <button id="reseed" type="button">new</button> <button id="live" type="button" title="l: everyone on this page sees the same edit at the same time">live</button></label>
       <label>frame <select id="aspect"><option value="16:9">16:9</option><option value="9:16">9:16 (vertical)</option><option value="1:1">1:1</option></select></label>
       <label>music <select id="music"></select></label>
       <label class="inline"><input type="checkbox" id="slowed"> slowed + reverb (tracks only)</label>
@@ -52,6 +56,9 @@
       <h2>pool</h2>
       <div id="stats" class="stats">…</div>
       <div id="tags" class="tags"></div>
+      <div id="staticNote" class="blurb hidden"></div>
+      <details id="credits" class="hidden"><summary>sources and credits</summary><ul></ul></details>
+      <div id="ingest">
       <div id="empty" class="empty hidden">the pool is empty. queue the starter jobs below, or drop videos in <code>media/inbox</code> and run the <code>local</code> provider.</div>
       <form id="jobForm">
         <label>source
@@ -70,9 +77,11 @@
         </div>
       </form>
       <ul id="jobs"></ul>
+      </div>
     </section>
+    <footer class="foot"><a href="https://github.com/432meadow/corecore" target="_blank" rel="noopener">source on github</a></footer>
   </aside>
 
-  <script type="module" src="/web/app.js"></script>
+  <script type="module" src="web/app.js"></script>
 </body>
 </html>

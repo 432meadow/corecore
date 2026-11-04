@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS clips (
   motion REAL,
   loudness REAL,
   tags TEXT DEFAULT ',',
+  faces INTEGER DEFAULT 0,
   banned INTEGER DEFAULT 0,
   plays INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
@@ -76,6 +77,9 @@ def connect() -> sqlite3.Connection:
 def init() -> None:
     with connect() as conn:
         conn.executescript(SCHEMA)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(clips)")}
+        if "faces" not in cols:  # databases created before face tagging existed
+            conn.execute("ALTER TABLE clips ADD COLUMN faces INTEGER DEFAULT 0")
 
 
 # Tags are stored as ",a,b,c," so that `tags LIKE '%,a,%'` is an exact-token match.

@@ -64,6 +64,7 @@ export class Player {
     this.flashUntil = 0;
     this.flashStrength = 0;
     this.showInfo = false;
+    this.snapEnabled = true;
     this.waitingSince = null;
     this.setAspect('16:9');
   }
@@ -136,13 +137,39 @@ export class Player {
     slot.busy = false;
   }
 
-  async start() {
+  async start({ fastForward = 0 } = {}) {
     if (!this.pool.length) this.initPool();
     this.running = true;
     this.paused = false;
+    if (fastForward > 0) await this.fastForward(fastForward);
     await this.fillQueue();
     this.advance();
     requestAnimationFrame(() => this.frame());
+  }
+
+  // Walk the deterministic cue stream without showing it, so a viewer joining a live channel lands
+  // on the same cue everyone else is watching. The straddling cue is trimmed to the remaining time.
+  async fastForward(seconds) {
+    let t = 0;
+    let guard = 0;
+    while (t < seconds && guard++ < 600) {
+      let cues = [];
+      try { cues = await this.sequencer.nextPhrase(); } catch (err) { break; }
+      if (!cues.length) continue;
+      for (const c of cues) {
+        if (t >= seconds) { this.queue.push(c); continue; }
+        if (t + c.dur > seconds) {
+          const into = seconds - t;
+          if (c.kind === 'clip') c.offset += into * c.speed;
+          c.dur -= into;
+          t = seconds;
+          if (c.dur >= 0.15) this.queue.push(c);
+        } else {
+          t += c.dur;
+        }
+      }
+    }
+    this.stats.skipped = Math.round(t);
   }
 
   stop() {
@@ -273,7 +300,7 @@ export class Player {
   // Music onsets can pull a cut forward once most of the planned duration has elapsed.
   onOnset(strength) {
     const c = this.current;
-    if (!c || !c.snap || this.paused) return;
+    if (!c || !c.snap || this.paused || !this.snapEnabled) return;
     const now = this.audio.now();
     const head = this.queue[0];
     if (now - c.start > c.dur * 0.6 && strength > 1.2 && head && (head.kind !== 'clip' || head.ready)) {
@@ -473,12 +500,17 @@ export class Player {
     this.prepareAhead();
   }
 
-  flush() {
+  // Drop everything queued and start over from the sequencer (new seed or mode), optionally
+  // fast-forwarded into the new stream.
+  async restart(fastForward = 0) {
     for (const c of this.queue) if (c.slot) { this.release(c.slot); c.slot = null; }
     this.queue = [];
+    if (fastForward > 0) await this.fastForward(fastForward);
     this.skip();
     return this.fillQueue();
   }
+
+  flush() { return this.restart(0); }
 
   async pause() {
     this.paused = true;
