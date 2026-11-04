@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import socket
 import threading
 import time
 from typing import Callable
@@ -19,6 +21,28 @@ def create_job(provider: str, query: str | None, url: str | None, max_items: int
         cur = conn.execute("INSERT INTO jobs (provider, query, url, max_items, tags) VALUES (?, ?, ?, ?, ?)",
                            (provider, query or None, url or None, int(max_items), db.tags_to_db(tags)))
         return cur.lastrowid
+
+
+def owner_token() -> str:
+    return f"{socket.gethostname()}:{os.getpid()}"
+
+
+def owner_alive(token: str | None) -> bool:
+    """A 'running' job is only stale if its owner process is gone. Other hosts can't be checked: assume alive."""
+    if not token or ":" not in token:
+        return False
+    host, _, pid = token.rpartition(":")
+    if host != socket.gethostname() or not pid.isdigit():
+        return True
+    if int(pid) == os.getpid():
+        return False
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
 
 
 def _update(job_id: int, **fields) -> None:
@@ -53,7 +77,7 @@ def run_job(job_id: int, echo: Callable[[str], None] | None = None, deadline: fl
     def cancelled() -> bool:
         return out_of_time() or _status(job_id) == "cancelled"
 
-    _update(job_id, status="running", progress=0.0, message="searching")
+    _update(job_id, status="running", progress=0.0, message="searching", owner=owner_token())
     tags = db.tags_from_db(job["tags"])
     try:
         provider = get_provider(job["provider"])
@@ -117,7 +141,8 @@ def claim_next() -> int | None:
         if row is None:
             conn.execute("COMMIT")
             return None
-        conn.execute("UPDATE jobs SET status = 'running', updated_at = datetime('now') WHERE id = ?", (row["id"],))
+        conn.execute("UPDATE jobs SET status = 'running', owner = ?, updated_at = datetime('now') WHERE id = ?",
+                     (owner_token(), row["id"]))
         conn.execute("COMMIT")
         return row["id"]
 
@@ -130,9 +155,11 @@ class Worker(threading.Thread):
         self.stop_event = threading.Event()
 
     def run(self) -> None:
-        # jobs left 'running' by a previous crashed process go back to the queue
+        # jobs left 'running' by a crashed process go back to the queue; jobs a live process owns are left alone
         with db.connect() as conn:
-            conn.execute("UPDATE jobs SET status = 'queued' WHERE status = 'running'")
+            for row in conn.execute("SELECT id, owner FROM jobs WHERE status = 'running'").fetchall():
+                if not owner_alive(row["owner"]):
+                    conn.execute("UPDATE jobs SET status = 'queued', owner = NULL WHERE id = ?", (row["id"],))
         while not self.stop_event.is_set():
             job_id = claim_next()
             if job_id is None:

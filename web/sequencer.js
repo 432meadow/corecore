@@ -128,11 +128,17 @@ export class Sequencer {
     this.stepIndex = 0;
   }
 
+  // Everything the next pick depends on goes back to its initial state, so two viewers that reseed to the
+  // same value produce the same stream regardless of what they watched before.
   reseed(seed) {
     this.seed = seed;
     this.rng = makeRng(seed);
     this.stepIndex = 0;
+    this.cycleCount = 0;
     this.motifs = [];
+    this.theme = null;
+    this.lastSource = null;
+    this.catalog.reset?.();
   }
 
   async nextPhrase() {

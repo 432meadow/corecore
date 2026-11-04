@@ -24,20 +24,31 @@ export class Catalog {
   // (small pools), the exclusion shrinks until something comes back, so the stream never dries up.
   async fill(n = 150) {
     if (this.fetching) return this.fetching;
+    if (this.backoffUntil && performance.now() < this.backoffUntil) return this.pool.length;
     this.lastFill = performance.now();
     this.fetching = (async () => {
       const total = this.stats.clips || 0;
       const cap = Math.max(8, Math.min(300, Math.floor(total * 0.5)));
       if (this.recent.length > cap) this.recent.splice(0, this.recent.length - cap);
       const want = Math.min(n, Math.max(4, Math.floor(total * 0.25)));
+      const start = this.pool.length;
       for (const recent of [this.recent.slice(-cap), this.recent.slice(-Math.min(6, cap)), []]) {
         const before = this.pool.length;
         await this.fetchInto(n, [...recent, ...this.bad]);
         if (this.pool.length - before >= want) break;
       }
+      this.backoffUntil = this.pool.length === start ? performance.now() + 3000 : 0;
       return this.pool.length;
-    })().finally(() => { this.fetching = null; });
+    })().catch((err) => { this.backoffUntil = performance.now() + 3000; throw err; })
+      .finally(() => { this.fetching = null; });
     return this.fetching;
+  }
+
+  // Forget play history so a reseed replays the same decisions (the live channel depends on it).
+  reset() {
+    this.recent = [];
+    this.generation = 0;
+    this.backoffUntil = 0;
   }
 
   async fetchInto(n, exclude) {

@@ -213,17 +213,21 @@ export class Player {
     const slot = this.acquire(cue.clip.id);
     if (!slot) { cue.preparing = false; return; }
     const el = slot.el;
+    // a cue can be discarded (next phrase, restart, timeout) while we wait on the network: give the slot back
+    const abandoned = () => cue.dropped || cue.failed;
     try {
       if (slot.clipId !== cue.clip.id || !el.currentSrc) {
         slot.clipId = cue.clip.id;
         el.src = cue.clip.url;
         el.load();
         await waitEvent(el, 'loadedmetadata', 8000);
+        if (abandoned()) { this.release(slot); cue.preparing = false; return; }
       }
       el.playbackRate = cue.speed;
       el.defaultPlaybackRate = cue.speed;
       el.currentTime = cue.offset;
       await waitSeek(el, 8000);
+      if (abandoned()) { this.release(slot); cue.preparing = false; return; }
       cue.slot = slot;
       cue.ready = true;
     } catch (err) {
@@ -239,6 +243,10 @@ export class Player {
 
   advance() {
     const now = this.audio.now();
+    if (this.restarting) {
+      if (this.current) this.current.end = now + 0.05;
+      return;
+    }
     let next = this.queue.shift();
     while (next && next.kind === 'clip' && next.failed) next = this.queue.shift();
     if (!next) {
@@ -252,6 +260,7 @@ export class Player {
       this.waitingSince ??= now;
       if (now - this.waitingSince > 2.0) {
         next.failed = true;
+        next.dropped = true;
         this.queue.shift();
         if (next.slot) { this.release(next.slot); next.slot = null; }
         this.waitingSince = null;
@@ -494,6 +503,7 @@ export class Player {
     const cyc = this.current?.cycle;
     while (this.queue.length && this.queue[0].phrase === ph && this.queue[0].cycle === cyc) {
       const c = this.queue.shift();
+      c.dropped = true;
       if (c.slot) { this.release(c.slot); c.slot = null; }
     }
     this.skip();
@@ -503,9 +513,15 @@ export class Player {
   // Drop everything queued and start over from the sequencer (new seed or mode), optionally
   // fast-forwarded into the new stream.
   async restart(fastForward = 0) {
-    for (const c of this.queue) if (c.slot) { this.release(c.slot); c.slot = null; }
-    this.queue = [];
-    if (fastForward > 0) await this.fastForward(fastForward);
+    this.restarting = true;
+    try {
+      if (this.filling) await this.filling.catch(() => {});
+      for (const c of this.queue) { c.dropped = true; if (c.slot) { this.release(c.slot); c.slot = null; } }
+      this.queue = [];
+      if (fastForward > 0) await this.fastForward(fastForward);
+    } finally {
+      this.restarting = false;
+    }
     this.skip();
     return this.fillQueue();
   }
@@ -520,8 +536,8 @@ export class Player {
   }
 
   async resume() {
-    if (this.audio.ctx) await this.audio.ctx.resume();
     this.paused = false;
+    if (this.audio.ctx) await this.audio.ctx.resume();
     if (this.current?.slot && !this.current.holdAt && this.current.fx?.hold !== true) this.current.slot.el.play().catch(() => {});
     else if (this.current?.slot && this.current.holdAt) this.current.slot.el.play().catch(() => {});
     this.previous?.slot?.el.play().catch(() => {});

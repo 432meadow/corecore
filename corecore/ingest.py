@@ -70,8 +70,11 @@ def ingest_candidate(cand: Candidate, tags: list[str], *, query: str = "", logge
             shots = ffmpeg.shots_from_cuts(info["duration"], cuts)
             shots = ffmpeg.spread(shots, config.MAX_CLIPS_PER_SOURCE)
             logger(f"{len(cuts)} cuts -> {len(shots)} clips")
+            stopped = False
+            failed = 0
             for i, (start, length) in enumerate(shots):
                 if should_cancel():
+                    stopped = True
                     break
                 stem = f"{source_id}_{i:03d}"
                 seg = config.SEGMENTS_DIR / f"{stem}.{config.SEGMENT_FORMAT}"
@@ -85,6 +88,7 @@ def ingest_candidate(cand: Candidate, tags: list[str], *, query: str = "", logge
                     n_faces = faces.faces_in_clip(seg, seg_info["duration"])
                 except ffmpeg.FFmpegError as e:
                     logger(f"clip {stem} failed: {e}")
+                    failed += 1
                     for p in (seg, thumb):
                         if p.exists():
                             p.unlink()
@@ -99,9 +103,17 @@ def ingest_candidate(cand: Candidate, tags: list[str], *, query: str = "", logge
                      seg_info["width"], seg_info["height"], int(seg_info["has_audio"]), stats["brightness"],
                      stats["saturation"], stats["motion"], loud, n_faces, db.tags_to_db(clip_tags)))
                 added += 1
-            conn.execute("UPDATE sources SET status = 'done', duration = COALESCE(duration, ?) WHERE id = ?",
-                         (info["duration"], source_id))
-            logger(f"added {added} clips from {cand.title or cand.external_id}")
+            if stopped:
+                # leave it 'pending' so the next run picks it up again instead of skipping it forever
+                conn.execute("UPDATE sources SET status = 'pending', error = 'stopped before finishing', "
+                             "duration = COALESCE(duration, ?) WHERE id = ?", (info["duration"], source_id))
+                logger(f"stopped after {added} clips from {cand.title or cand.external_id}")
+            elif shots and added == 0:
+                raise RuntimeError(f"all {failed} clips failed to encode")
+            else:
+                conn.execute("UPDATE sources SET status = 'done', duration = COALESCE(duration, ?) WHERE id = ?",
+                             (info["duration"], source_id))
+                logger(f"added {added} clips from {cand.title or cand.external_id}")
         except Exception as e:  # noqa: BLE001 - one bad source must not kill the job
             conn.execute("UPDATE sources SET status = 'failed', error = ? WHERE id = ?", (str(e)[:500], source_id))
             logger(f"failed: {cand.title or cand.external_id}: {e}")

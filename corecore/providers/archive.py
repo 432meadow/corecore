@@ -97,6 +97,8 @@ class ArchiveProvider(Provider):
         for fl in ("identifier", "title", "creator", "licenseurl", "runtime"):
             params.append(("fl[]", fl))
         data = _get_json(SEARCH_URL + "?" + urllib.parse.urlencode(params))
+        if "error" in data or "response" not in data:  # advancedsearch answers bad queries with HTTP 200 + {"error": ...}
+            raise ProviderError(f"archive search error: {data.get('error', data)}")
         docs = data.get("response", {}).get("docs", [])
         cands = []
         for d in docs:
@@ -122,14 +124,20 @@ class ArchiveProvider(Provider):
         dest = dest_dir / f"archive_{cand.external_id}.mp4"
         log(f"downloading {f['name']} ({int(f.get('size') or 0) // 2**20} MB)")
         req = urllib.request.Request(url, headers={"User-Agent": config.HTTP_USER_AGENT})
+        part = dest.with_suffix(".part")
         got = 0
-        with urllib.request.urlopen(req, timeout=120) as resp, open(dest, "wb") as out:
-            while True:
-                chunk = resp.read(1 << 20)
-                if not chunk:
-                    break
-                out.write(chunk)
-                got += len(chunk)
-                if got > config.MAX_SOURCE_BYTES:
-                    raise ProviderError("download exceeded MAX_SOURCE_BYTES")
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp, open(part, "wb") as out:
+                while True:
+                    chunk = resp.read(1 << 20)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                    got += len(chunk)
+                    if got > config.MAX_SOURCE_BYTES:
+                        raise ProviderError("download exceeded MAX_SOURCE_BYTES")
+            part.replace(dest)
+        except BaseException:
+            part.unlink(missing_ok=True)  # never leave a truncated file where the next run could trust it
+            raise
         return dest

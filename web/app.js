@@ -231,6 +231,7 @@ async function seedStarter() {
 }
 
 async function toggleRecord() {
+  if (!state.started) { toast('start playback first'); return; }
   if (recorder.active) {
     const blob = await recorder.stop();
     if (blob) recorder.download(blob, `corecore-${state.mode}-${state.seed}-${Date.now()}.webm`);

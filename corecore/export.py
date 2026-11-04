@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import random
 import shutil
+import urllib.parse
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -117,7 +118,7 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
         for p in sorted(config.MUSIC_DIR.iterdir()):
             if p.is_file() and p.suffix.lower() in config.MUSIC_EXTENSIONS:
                 shutil.copy2(p, out / "music" / p.name)
-                music.append({"name": p.name, "url": f"music/{p.name}"})
+                music.append({"name": p.name, "url": f"music/{urllib.parse.quote(p.name)}"})
 
     manifest = {
         "version": 1,

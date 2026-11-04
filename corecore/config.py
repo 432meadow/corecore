@@ -39,7 +39,10 @@ YTDLP_COOKIES_FILE = os.environ.get("YTDLP_COOKIES_FILE")
 YTDLP_COOKIES_FROM_BROWSER = os.environ.get("YTDLP_COOKIES_FROM_BROWSER")  # e.g. "chrome", "firefox"
 YTDLP_MAX_HEIGHT = int(os.environ.get("YTDLP_MAX_HEIGHT", 720))
 
-VIDEO_EXTENSIONS = {".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".mpg", ".mpeg", ".ts", ".flv", ".wmv", ".ogv"}
+VIDEO_EXTENSIONS = {".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".mpg", ".mpeg", ".m2ts", ".flv", ".wmv", ".ogv"}
+
+# Directories the `local` provider may read when a job comes in over the API. The CLI adds the path you give it.
+LOCAL_ROOTS: list[Path] = [INBOX_DIR] + [Path(p).expanduser() for p in os.environ.get("CORECORE_LOCAL_ROOTS", "").split(os.pathsep) if p]
 MUSIC_EXTENSIONS = {".mp3", ".ogg", ".oga", ".wav", ".m4a", ".flac", ".aac", ".opus"}
 
 

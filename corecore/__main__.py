@@ -56,6 +56,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "ingest":
         from .jobs import create_job, run_job
+        if args.provider in ("local", "file", "files", "inbox"):
+            from pathlib import Path
+            given = (args.url or args.query or "").replace("file://", "")
+            if given:
+                target = Path(given).expanduser()
+                config.LOCAL_ROOTS.append(target if target.is_dir() else target.parent)
         job_id = create_job(args.provider, args.query, args.url, args.max_items, args.tags)
         run_job(job_id, echo=lambda m: print(f"  {m}"))
         with db.connect() as conn:

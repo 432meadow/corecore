@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import urllib.parse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -55,11 +56,23 @@ def stats():
         return db.stats(conn)
 
 
+def _parse_ids(raw: str | None) -> list[int] | None:
+    out = []
+    for tok in (raw or "").split(","):
+        try:
+            v = int(tok.strip())
+        except ValueError:
+            continue
+        if 0 <= v < 2**62:
+            out.append(v)
+    return out or None
+
+
 @app.get("/api/clips/sample")
 def clips_sample(n: int = Query(100, ge=1, le=500), tags: str | None = None, exclude: str | None = None,
                  seed: int | None = None):
     tag_list = [t for t in (tags or "").split(",") if t.strip()] or None
-    excl = [int(x) for x in (exclude or "").split(",") if x.strip().lstrip("-").isdigit()] or None
+    excl = _parse_ids(exclude)
     with db.connect() as conn:
         rows = db.sample_clips(conn, n=n, tags=tag_list, exclude=excl, seed=seed)
         return {"clips": [db.clip_to_dict(r) for r in rows]}
@@ -71,8 +84,11 @@ def clips_list(offset: int = Query(0, ge=0), limit: int = Query(60, ge=1, le=500
     where = [] if include_banned else ["c.banned = 0"]
     params: list = []
     if tag:
-        where.append("c.tags LIKE ?")
-        params.append(f"%,{tag.strip().lower()},%")
+        pattern = db.tag_like(tag)
+        if not pattern:
+            return {"clips": [], "offset": offset, "limit": limit}
+        where.append("c.tags LIKE ? ESCAPE '\\'")
+        params.append(pattern)
     sql = ("SELECT c.*, s.title AS source_title, s.uploader AS source_uploader, s.url AS source_url, s.provider AS provider,"
            " s.license AS license FROM clips c JOIN sources s ON s.id = c.source_id")
     if where:
@@ -159,7 +175,7 @@ def music():
     config.ensure_dirs()
     tracks = sorted(p.name for p in config.MUSIC_DIR.iterdir()
                     if p.is_file() and p.suffix.lower() in config.MUSIC_EXTENSIONS)
-    return {"tracks": [{"name": t, "url": f"/media/music/{t}"} for t in tracks]}
+    return {"tracks": [{"name": t, "url": f"media/music/{urllib.parse.quote(t)}"} for t in tracks]}
 
 
 @app.get("/")
@@ -173,5 +189,7 @@ async def provider_error(_, exc: ProviderError):
 
 
 config.ensure_dirs()
-app.mount("/media", StaticFiles(directory=str(config.MEDIA_DIR)), name="media")
+# Only the public subfolders are served: the database, the inbox and in-flight downloads also live under media/.
+for sub in ("segments", "thumbs", "music"):
+    app.mount(f"/media/{sub}", StaticFiles(directory=str(config.MEDIA_DIR / sub)), name=f"media-{sub}")
 app.mount("/web", StaticFiles(directory=str(config.WEB_DIR)), name="web")

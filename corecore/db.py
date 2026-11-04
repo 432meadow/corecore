@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   progress REAL DEFAULT 0,
   message TEXT DEFAULT '',
   clips_added INTEGER DEFAULT 0,
+  owner TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -80,6 +81,9 @@ def init() -> None:
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(clips)")}
         if "faces" not in cols:  # databases created before face tagging existed
             conn.execute("ALTER TABLE clips ADD COLUMN faces INTEGER DEFAULT 0")
+        jcols = {r["name"] for r in conn.execute("PRAGMA table_info(jobs)")}
+        if "owner" not in jcols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN owner TEXT")
 
 
 # Tags are stored as ",a,b,c," so that `tags LIKE '%,a,%'` is an exact-token match.
@@ -100,6 +104,16 @@ def tags_from_db(s: str | None) -> list[str]:
     return [t for t in (s or "").split(",") if t]
 
 
+def tag_like(tag: str) -> str | None:
+    """LIKE pattern matching exactly one stored tag token. Normalised like storage, with the LIKE
+    metacharacters escaped (use with `LIKE ? ESCAPE '\\'`)."""
+    norm = tags_from_db(tags_to_db([tag]))
+    if not norm:
+        return None
+    t = norm[0].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%,{t},%"
+
+
 def sample_clips(conn: sqlite3.Connection, n: int = 100, tags: list[str] | None = None,
                  exclude: list[int] | None = None, seed: int | None = None) -> list[sqlite3.Row]:
     """Random sample of playable clips, joined with their source. A seed makes the order repeatable
@@ -107,8 +121,11 @@ def sample_clips(conn: sqlite3.Connection, n: int = 100, tags: list[str] | None 
     where = ["c.banned = 0"]
     params: list = []
     if tags:
-        where.append("(" + " OR ".join("c.tags LIKE ?" for _ in tags) + ")")
-        params.extend(f"%,{t.strip().lower()},%" for t in tags)
+        patterns = [p for p in (tag_like(t) for t in tags) if p]
+        if not patterns:
+            return []
+        where.append("(" + " OR ".join("c.tags LIKE ? ESCAPE '\\'" for _ in patterns) + ")")
+        params.extend(patterns)
     if exclude:
         exclude = [int(x) for x in exclude][:2000]
         where.append(f"c.id NOT IN ({','.join('?' * len(exclude))})")

@@ -54,8 +54,13 @@ class YtDlpProvider(Provider):
         if not (url or query):
             raise ProviderError("ytdlp provider needs a query or a URL")
         target = url or f"ytsearch{max(1, max_items * 2)}:{query}"
-        with yt_dlp.YoutubeDL(_ydl_opts(extract_flat="in_playlist", skip_download=True, playlistend=max_items * 3)) as ydl:
-            info = ydl.extract_info(target, download=False)
+        try:
+            # "only_download": skip broken entries inside a playlist, but a failing top-level URL is an error
+            with yt_dlp.YoutubeDL(_ydl_opts(extract_flat="in_playlist", skip_download=True, playlistend=max_items * 3,
+                                            ignoreerrors="only_download")) as ydl:
+                info = ydl.extract_info(target, download=False)
+        except yt_dlp.utils.DownloadError as e:
+            raise ProviderError(f"yt-dlp: {e}") from e
         cands = []
         for e in _entries(info):
             dur = e.get("duration")
@@ -82,20 +87,17 @@ class YtDlpProvider(Provider):
         opts = _ydl_opts(format=fmt, outtmpl=str(dest_dir / "ytdlp_%(id)s.%(ext)s"), merge_output_format="mp4",
                          noplaylist=True, max_filesize=config.MAX_SOURCE_BYTES, ignoreerrors=False)
         log(f"yt-dlp downloading {cand.url}")
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(cand.url, download=True)
-            if not info:
-                raise ProviderError("yt-dlp returned nothing")
-            path = None
-            for d in info.get("requested_downloads") or []:
-                if d.get("filepath"):
-                    path = Path(d["filepath"])
-                    break
-            if path is None:
-                path = Path(ydl.prepare_filename(info))
-        if not path.exists():
-            matches = sorted(dest_dir.glob(f"ytdlp_{info.get('id')}.*"))
-            if not matches:
-                raise ProviderError("yt-dlp finished but no file was written")
-            path = matches[0]
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(cand.url, download=True)
+        except yt_dlp.utils.DownloadError as e:
+            raise ProviderError(f"yt-dlp: {e}") from e
+        if not info:
+            raise ProviderError("yt-dlp returned nothing")
+        # A max_filesize abort is not an error for yt-dlp: it just leaves no filepath (and a .part on disk).
+        path = next((Path(d["filepath"]) for d in info.get("requested_downloads") or [] if d.get("filepath")), None)
+        if path is None or not path.exists() or path.suffix == ".part":
+            for leftover in dest_dir.glob(f"ytdlp_{info.get('id')}.*"):
+                leftover.unlink(missing_ok=True)
+            raise ProviderError("yt-dlp did not complete the download (too large, or blocked)")
         return path

@@ -179,6 +179,7 @@ class StarterBudgetTest(unittest.TestCase):
                             "-c:v", "libx264", "-preset", "ultrafast", str(src)], check=True)
             original = seeds.STARTER_JOBS
             seeds.STARTER_JOBS = [{"provider": "local", "url": str(src), "max_items": 1, "tags": ["t"]}]
+            config.LOCAL_ROOTS.append(Path(d))
             try:
                 none = jobs.run_starter_jobs(time_budget=0)
                 self.assertEqual(none["jobs"], 0)
@@ -188,6 +189,91 @@ class StarterBudgetTest(unittest.TestCase):
                 self.assertGreaterEqual(done["clips"], 1)
             finally:
                 seeds.STARTER_JOBS = original
+                config.LOCAL_ROOTS.remove(Path(d))
                 with db.connect() as conn:
                     conn.execute("DELETE FROM sources")
                     conn.execute("DELETE FROM jobs")
+
+
+def _tiny_video(path: Path, seconds: int = 3) -> None:
+    subprocess.run([config.FFMPEG, "-y", "-loglevel", "error", "-t", str(seconds), "-f", "lavfi", "-i", "testsrc2=s=160x90:r=10",
+                    "-c:v", "libx264", "-preset", "ultrafast", str(path)], check=True)
+
+
+class ReviewRegressionTest(unittest.TestCase):
+    """Regressions for the defects found in the first code review."""
+
+    def test_local_provider_refuses_paths_outside_allowed_roots(self):
+        from corecore.providers.local import LocalProvider
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "outside.mp4"
+            _tiny_video(src)
+            with self.assertRaises(Exception):
+                LocalProvider().search(None, str(src), 1)
+            (Path(d) / "code.ts").write_text("export const x = 1;")
+            config.LOCAL_ROOTS.append(Path(d))
+            try:
+                cands = LocalProvider().search(None, d, 0)
+                self.assertEqual([Path(c.external_id).name for c in cands], ["outside.mp4"])  # .ts is not video
+            finally:
+                config.LOCAL_ROOTS.remove(Path(d))
+
+    def test_cancelled_ingest_leaves_source_pending(self):
+        from corecore.ingest import ingest_candidate
+        from corecore.providers import Candidate
+        db.init()
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "v.mp4"
+            _tiny_video(src)
+            cand = Candidate("local", str(src), src.as_uri(), title="v", extra={"keep": True})
+            added = ingest_candidate(cand, ["t"], logger=lambda m: None, should_cancel=lambda: True)
+            self.assertEqual(added, 0)
+            with db.connect() as conn:
+                row = conn.execute("SELECT status FROM sources WHERE external_id = ?", (str(src),)).fetchone()
+                self.assertEqual(row["status"], "pending")
+                added = ingest_candidate(cand, ["t"], logger=lambda m: None)
+                self.assertGreaterEqual(added, 1)
+                row = conn.execute("SELECT status FROM sources WHERE external_id = ?", (str(src),)).fetchone()
+                self.assertEqual(row["status"], "done")
+                conn.execute("DELETE FROM sources")
+
+    def test_tag_filters_escape_like_wildcards(self):
+        db.init()
+        with db.connect() as conn:
+            conn.execute("INSERT INTO sources (provider, external_id, title, status) VALUES ('local', 'like', 't', 'done')")
+            sid = conn.execute("SELECT id FROM sources WHERE external_id = 'like'").fetchone()["id"]
+            conn.execute("INSERT INTO clips (source_id, file, duration, tags) VALUES (?, 'segments/l.mp4', 1, ',city,')", (sid,))
+            self.assertEqual(len(db.sample_clips(conn, n=10, tags=["%"])), 0)
+            self.assertEqual(len(db.sample_clips(conn, n=10, tags=["cit_"])), 0)
+            self.assertEqual(len(db.sample_clips(conn, n=10, tags=["City"])), 1)
+            self.assertEqual(db.tag_like("a_b%"), "%,a\\_b\\%,%")
+            conn.execute("DELETE FROM sources")
+
+    def test_exclude_parsing_never_raises(self):
+        from corecore.app import _parse_ids
+        self.assertEqual(_parse_ids("1, 2,x,--3,²,99999999999999999999999"), [1, 2])
+        self.assertIsNone(_parse_ids(""))
+        self.assertIsNone(_parse_ids("abc"))
+
+    def test_archive_search_error_is_an_error(self):
+        from corecore.providers import archive
+        original = archive._get_json
+        archive._get_json = lambda url, timeout=60: {"error": "a token is at an unexpected position"}
+        try:
+            with self.assertRaises(archive.ProviderError):
+                archive.ArchiveProvider().search("collection:prelinger AND )", None, 3)
+        finally:
+            archive._get_json = original
+
+    def test_worker_only_requeues_dead_owners(self):
+        from corecore.jobs import owner_alive, owner_token
+        self.assertTrue(owner_alive("otherhost:1"))      # cannot check another host: assume alive
+        self.assertFalse(owner_alive(None))
+        self.assertFalse(owner_alive(owner_token()))      # our own pid is not "another live owner"
+        self.assertFalse(owner_alive(f"{owner_token().rsplit(':', 1)[0]}:999999"))
+
+    def test_media_mount_does_not_expose_database(self):
+        from corecore.app import app
+        paths = [r.path for r in app.routes]
+        self.assertIn("/media/segments", paths)
+        self.assertNotIn("/media", paths)
