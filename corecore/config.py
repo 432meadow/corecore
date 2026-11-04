@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 ROOT = Path(os.environ.get("CORECORE_ROOT", Path(__file__).resolve().parent.parent))
@@ -53,17 +54,24 @@ _DEFAULT_BLOCKLIST = [
     "try on", "try-on", "egirl", "e-girl", "omegle", "strip", "stripper", "hentai", "nsfw", "fetish", "bikini",
     "shooting", "shoots", "shootout", "shot dead", "killed", "killing", "kills", "murder", "homicide", "assassin",
     "beheading", "execution", "gore", "dead body", "suicide", "rape", "isis", "massacre", "snuff", "combat footage",
-    "airstrike", "drone strike", "graphic", "terror", "terrorist", "war footage", "frontline", "9/11", "9 11",
-    "hostage", "stabbing", "stabbed", "bodycam", "body cam",
+    "airstrike", "drone strike", "graphic", "terror", "terrorist", "terrorists", "war", "warzone", "frontline",
+    "front-line", "combat", "attack", "attacks", "soldier", "soldiers", "military", "army", "troops", "missile",
+    "missiles", "invasion", "genocide", "bodies", "9/11", "9 11", "hostage", "hostages", "stabbing", "stabbed",
+    "bodycam", "body cam", "police chase", "arrest", "arrested",
 ]
 _env_block = os.environ.get("CORECORE_BLOCKLIST", "")
 BLOCKLIST: list[str] = [] if _env_block.strip().lower() == "off" else (
     _DEFAULT_BLOCKLIST + [w.strip().lower() for w in _env_block.split(",") if w.strip()])
 
 
+_BLOCK_RE = re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(w) for w in BLOCKLIST) + r")(?![a-z0-9])") if BLOCKLIST else None
+
+
 def blocked_title(title: str | None) -> bool:
-    t = (title or "").lower()
-    return any(w in t for w in BLOCKLIST)
+    """Whole-word match (so "war" does not catch "warm" or "software"), case-insensitive."""
+    if not _BLOCK_RE:
+        return False
+    return bool(_BLOCK_RE.search((title or "").lower()))
 
 
 def ensure_dirs() -> None:

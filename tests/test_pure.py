@@ -293,6 +293,10 @@ class ContemporaryTest(unittest.TestCase):
         self.assertTrue(config.blocked_title("GIRL GETS NAKED ON CAM FOR YOUTUBE"))
         self.assertFalse(config.blocked_title("Shibuya New Year Walk 4K"))
         self.assertFalse(config.blocked_title(None))
+        self.assertTrue(config.blocked_title("Russia's NEW Anti-Drone Tanks Just Entered Combat"))
+        self.assertTrue(config.blocked_title("Moscow concert hall attack - RAW VIDEO [GRAPHIC]"))
+        for ok in ("a warm day in Essex", "software tutorial", "award show vlog", "stripes on my cat", "sex pistols cover"):
+            self.assertEqual(config.blocked_title(ok), ok.startswith("sex"), ok)   # whole words only
 
     def test_ytdlp_pasted_links_become_candidates(self):
         from corecore.providers.ytdlp import YtDlpProvider
