@@ -35,7 +35,7 @@ export class WashGenerator {
     this.ctx = engine.ctx;
     this.rng = rng;
     this.p = Object.assign({
-      root: 57, mode: 'aeolian', chordSeconds: [14, 26], glide: [2.5, 5], level: 0.55, brightness: 0.35,
+      root: 57, mode: 'aeolian', chordSeconds: [14, 26], glide: [2.5, 5], level: 0.36, brightness: 0.35,
       motion: 0.4, strings: 1, choir: 0.7, air: 0.6, sub: 0.8, shimmer: 0.6, dissonance: 0.0, voices: 4,
     }, params);
     this.voices = [];
@@ -57,11 +57,11 @@ export class WashGenerator {
     this.out = ctx.createGain();
     this.out.gain.value = 0.0001;
     this.comp = ctx.createDynamicsCompressor();
-    this.comp.threshold.value = -20;
-    this.comp.knee.value = 12;
-    this.comp.ratio.value = 3;
-    this.comp.attack.value = 0.15;
-    this.comp.release.value = 1.2;
+    this.comp.threshold.value = -24;
+    this.comp.knee.value = 14;
+    this.comp.ratio.value = 2.5;
+    this.comp.attack.value = 0.2;
+    this.comp.release.value = 1.5;
     this.breath = ctx.createGain();          // slow breathing of the whole bed
     this.breath.gain.value = 1;
     this.out.connect(this.breath);
@@ -75,7 +75,7 @@ export class WashGenerator {
     this.verb.buffer = this.makeIR(7.5);
     this.verbTone = ctx.createBiquadFilter();
     this.verbTone.type = 'lowpass';
-    this.verbTone.frequency.value = 3800;
+    this.verbTone.frequency.value = 5600;
     this.send = ctx.createGain();
     this.send.gain.value = 0.9;
     this.send.connect(this.predelay);
@@ -84,13 +84,17 @@ export class WashGenerator {
     this.verbTone.connect(this.out);
 
     // string layer bus: lowpass that opens with intensity, slow wander, gentle stereo drift
+    this.stringsHp = ctx.createBiquadFilter();
+    this.stringsHp.type = 'highpass';
+    this.stringsHp.frequency.value = 85;
     this.stringsFilter = ctx.createBiquadFilter();
     this.stringsFilter.type = 'lowpass';
     this.stringsFilter.Q.value = 0.6;
-    this.stringsFilter.frequency.value = 420;
+    this.stringsFilter.frequency.value = 800;
     this.stringsGain = ctx.createGain();
     this.stringsGain.gain.value = 0.0001;
     this.stringsPan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    this.stringsHp.connect(this.stringsFilter);
     this.stringsFilter.connect(this.stringsGain);
     let tail = this.stringsGain;
     if (this.stringsPan) { this.stringsGain.connect(this.stringsPan); tail = this.stringsPan; }
@@ -103,7 +107,7 @@ export class WashGenerator {
     this.choirIn = ctx.createGain();
     this.choirGain = ctx.createGain();
     this.choirGain.gain.value = 0.0001;
-    for (const [f, q, g] of [[760, 4, 1], [1180, 6, 0.7], [2600, 8, 0.25]]) {
+    for (const [f, q, g] of [[720, 3, 1], [1150, 4, 0.8], [2500, 4, 0.65]]) {
       const bp = ctx.createBiquadFilter();
       bp.type = 'bandpass';
       bp.frequency.value = f;
@@ -115,8 +119,17 @@ export class WashGenerator {
       bg.connect(this.choirGain);
       this.lfo(bp.frequency, 0.03 + this.rng.range(0, 0.02), f * 0.08);
     }
-    this.choirGain.connect(this.out);
-    this.choirGain.connect(this.send);
+    this.choirPan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    if (this.choirPan) {
+      this.choirGain.connect(this.choirPan);
+      this.choirPan.connect(this.out);
+      this.choirPan.connect(this.send);
+      const drift = this.lfo(this.choirPan.pan, 0.019, 0.4);   // drifts against the strings
+      drift.frequency.value = 0.019;
+    } else {
+      this.choirGain.connect(this.out);
+      this.choirGain.connect(this.send);
+    }
 
     // air: filtered noise, wandering band, mostly in the reverb
     this.noise = ctx.createBufferSource();
@@ -124,19 +137,22 @@ export class WashGenerator {
     this.noise.loop = true;
     this.airBand = ctx.createBiquadFilter();
     this.airBand.type = 'bandpass';
-    this.airBand.frequency.value = 1800;
-    this.airBand.Q.value = 0.9;
+    this.airBand.frequency.value = 2600;
+    this.airBand.Q.value = 0.7;
     this.airHp = ctx.createBiquadFilter();
     this.airHp.type = 'highpass';
-    this.airHp.frequency.value = 400;
+    this.airHp.frequency.value = 900;
     this.airGain = ctx.createGain();
     this.airGain.gain.value = 0.0001;
     this.noise.connect(this.airBand);
     this.airBand.connect(this.airHp);
     this.airHp.connect(this.airGain);
     this.airGain.connect(this.send);
-    this.airGain.connect(this.out);
-    this.lfo(this.airBand.frequency, 0.017, 900);
+    this.airDirect = ctx.createGain();
+    this.airDirect.gain.value = 1.6;
+    this.airGain.connect(this.airDirect);
+    this.airDirect.connect(this.out);
+    this.lfo(this.airBand.frequency, 0.017, 1100);
     this.noise.start(now);
 
     // sub: one sine on the root, two octaves down, slow amplitude breathing
@@ -151,7 +167,7 @@ export class WashGenerator {
     this.lfo(this.subGain.gain, 0.021, 0.02);
 
     // breathing: the whole bed rises and falls over about 25 seconds
-    this.lfo(this.breath.gain, 0.04, 0.12);
+    this.lfo(this.breath.gain, 0.035, 0.15);
 
     this.out.gain.setTargetAtTime(this.p.level, now, 4);
     this.playChord(now + 0.05, true);
@@ -249,8 +265,9 @@ export class WashGenerator {
     gain.gain.setValueAtTime(0.0001, at);
     gain.gain.exponentialRampToValueAtTime(1, at + attack);
     const oscs = [];
-    // strings: two detuned saws through the shared lowpass, a triangle below for body
-    for (const [type, det, amp, octave] of [['sawtooth', -9, 0.16, 0], ['sawtooth', 8, 0.16, 0], ['triangle', 0, 0.22, -12]]) {
+    const lowest = !this.voices.length || midi <= Math.min(...this.voices.map((v) => v.midi));
+    // strings: two detuned saws through the shared lowpass; a triangle an octave down only under the lowest voice
+    for (const [type, det, amp, octave] of [['sawtooth', -9, 0.15, 0], ['sawtooth', 8, 0.15, 0], ['triangle', 0, lowest ? 0.12 : 0.08, lowest ? -12 : 0]]) {
       const o = ctx.createOscillator();
       o.type = type;
       o.frequency.value = midiToFreq(midi + octave);
@@ -286,7 +303,7 @@ export class WashGenerator {
     const toStrings = ctx.createGain();
     toStrings.gain.value = 1;
     gain.connect(toStrings);
-    toStrings.connect(this.stringsFilter);
+    toStrings.connect(this.stringsHp);
     gain.connect(this.choirIn);
     this.lfos.push(vib);
     return { midi, gain, oscs, vib };
@@ -324,12 +341,22 @@ export class WashGenerator {
     o.detune.value = 8;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, at);
-    g.gain.exponentialRampToValueAtTime(0.035 * this.p.shimmer, at + 4);
+    g.gain.exponentialRampToValueAtTime(0.07 * this.p.shimmer, at + 4);
     g.gain.exponentialRampToValueAtTime(0.0001, at + 11);
     o.connect(g);
+    const o2 = this.ctx.createOscillator();
+    o2.type = 'sine';
+    o2.frequency.value = midiToFreq(midi + 12);
+    o2.detune.value = -5;
+    const g2 = this.ctx.createGain();
+    g2.gain.value = 0.35;
+    o2.connect(g2);
+    g2.connect(g);
     g.connect(this.send);
     o.start(at);
     o.stop(at + 11.5);
+    o2.start(at);
+    o2.stop(at + 11.5);
   }
 
   // ---- following the edit ---------------------------------------------------------------------
@@ -359,13 +386,13 @@ export class WashGenerator {
   applyIntensity(immediate = false) {
     const i = this.intensity, b = this.p.brightness;
     const now = this.ctx.currentTime, tc = immediate ? 0.01 : 1.6;
-    const cutoff = 300 + (600 + 2600 * b) * Math.pow(i, 1.4);
+    const cutoff = 420 + (900 + 3200 * b) * Math.pow(i, 1.3);
     this.stringsFilter.frequency.setTargetAtTime(cutoff, now, tc);
-    this.stringsGain.gain.setTargetAtTime((0.1 + 0.2 * i) * this.p.strings, now, tc);
-    this.choirGain.gain.setTargetAtTime((0.03 + 0.11 * i) * this.p.choir, now, tc);
-    this.airGain.gain.setTargetAtTime((0.004 + 0.022 * i) * this.p.air, now, tc);
-    this.subGain.gain.setTargetAtTime((0.05 + 0.05 * (1 - i)) * this.p.sub, now, tc);
-    this.send.gain.setTargetAtTime(0.65 + 0.3 * (1 - i), now, tc);
+    this.stringsGain.gain.setTargetAtTime((0.1 + 0.18 * i) * this.p.strings, now, tc);
+    this.choirGain.gain.setTargetAtTime((0.05 + 0.13 * i) * this.p.choir, now, tc);
+    this.airGain.gain.setTargetAtTime((0.03 + 0.09 * i) * this.p.air, now, tc);
+    this.subGain.gain.setTargetAtTime((0.03 + 0.03 * (1 - i)) * this.p.sub, now, tc);
+    this.send.gain.setTargetAtTime(0.6 + 0.3 * (1 - i), now, tc);
   }
 
   tick() {
