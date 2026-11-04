@@ -51,8 +51,9 @@ MUSIC_EXTENSIONS = {".mp3", ".ogg", ".oga", ".wav", ".m4a", ".flac", ".aac", ".o
 _DEFAULT_BLOCKLIST = [
     "naked", "nude", "nudes", "sex", "sexy", "porn", "xxx", "onlyfans", "ahegao", "sissy", "panties", "lingerie",
     "try on", "try-on", "egirl", "e-girl", "omegle", "strip", "stripper", "hentai", "nsfw", "fetish", "bikini",
-    "shooting", "shoots", "shot dead", "killed", "killing", "murder", "beheading", "execution", "gore", "dead body",
-    "suicide", "rape", "isis", "massacre", "snuff",
+    "shooting", "shoots", "shootout", "shot dead", "killed", "killing", "kills", "murder", "homicide", "assassin",
+    "beheading", "execution", "gore", "dead body", "suicide", "rape", "isis", "massacre", "snuff", "combat footage",
+    "airstrike", "drone strike",
 ]
 _env_block = os.environ.get("CORECORE_BLOCKLIST", "")
 BLOCKLIST: list[str] = [] if _env_block.strip().lower() == "off" else (

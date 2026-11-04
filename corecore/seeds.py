@@ -59,6 +59,22 @@ ARCHIVAL_JOBS = [
 _MT = "collection:mirrortube AND "
 _NEW = " |sort=date desc"
 CONTEMPORARY_JOBS = [
+    # Mirrored short-form uploads: TikTok (78k items), Instagram reels (11k), Twitter video (142k). Titles are
+    # the original captions, so hashtag words work as queries. Short clips: a few shots each, many sources.
+    {"provider": "archive", "query": "identifier:tiktok-* AND title:(vlog OR dayinmylife OR \"day in my life\" OR grwm)" + _NEW,
+     "max_items": 10, "tags": ["vlog", "faces", "home", "modern", "phone"]},
+    {"provider": "archive", "query": "identifier:tiktok-* AND title:(dashcam OR driving OR roadtrip OR nightdrive)" + _NEW,
+     "max_items": 8, "tags": ["dashcam", "traffic", "modern", "phone"]},
+    {"provider": "archive", "query": "identifier:tiktok-* AND title:(asmr OR satisfying OR relaxing OR cleaning)" + _NEW,
+     "max_items": 8, "tags": ["asmr", "quiet", "modern", "phone"]},
+    {"provider": "archive", "query": "identifier:tiktok-* AND title:(cat OR dog OR kitten OR puppy)" + _NEW,
+     "max_items": 8, "tags": ["animals", "home", "modern", "phone"]},
+    {"provider": "archive", "query": "identifier:tiktok-* AND title:(pov OR \"a day\" OR walk OR city OR night)" + _NEW,
+     "max_items": 8, "tags": ["city", "vlog", "modern", "phone"]},
+    {"provider": "archive", "query": "identifier:instagram-*" + _NEW, "max_items": 10,
+     "tags": ["reels", "modern", "phone"]},
+    {"provider": "archive", "query": "identifier:twitter-* AND title:(dashcam OR cctv OR \"caught on\" OR footage OR \"right now\")" + _NEW,
+     "max_items": 8, "tags": ["news", "cctv", "modern"]},
     {"provider": "archive", "query": _MT + 'title:("dash cam" OR dashcam)' + _NEW, "max_items": 6,
      "tags": ["dashcam", "traffic", "modern"]},
     {"provider": "archive", "query": _MT + 'title:(dashcam OR "dash cam") AND title:(russia OR russian OR winter OR snow OR compilation)' + _NEW,
@@ -88,22 +104,6 @@ CONTEMPORARY_JOBS = [
      "max_items": 4, "tags": ["quiet", "still", "modern"]},
     {"provider": "archive", "query": _MT + 'title:("first day" OR "last day" OR "we moved" OR "moving out" OR goodbye)' + _NEW,
      "max_items": 4, "tags": ["home", "faces", "modern"]},
-    # Mirrored short-form uploads: TikTok (78k items), Instagram reels (11k), Twitter video (142k). Titles are
-    # the original captions, so hashtag words work as queries. Short clips: a few shots each, many sources.
-    {"provider": "archive", "query": "identifier:tiktok-* AND title:(vlog OR dayinmylife OR \"day in my life\" OR grwm)" + _NEW,
-     "max_items": 10, "tags": ["vlog", "faces", "home", "modern", "phone"]},
-    {"provider": "archive", "query": "identifier:tiktok-* AND title:(dashcam OR driving OR roadtrip OR nightdrive)" + _NEW,
-     "max_items": 8, "tags": ["dashcam", "traffic", "modern", "phone"]},
-    {"provider": "archive", "query": "identifier:tiktok-* AND title:(asmr OR satisfying OR relaxing OR cleaning)" + _NEW,
-     "max_items": 8, "tags": ["asmr", "quiet", "modern", "phone"]},
-    {"provider": "archive", "query": "identifier:tiktok-* AND title:(cat OR dog OR kitten OR puppy)" + _NEW,
-     "max_items": 8, "tags": ["animals", "home", "modern", "phone"]},
-    {"provider": "archive", "query": "identifier:tiktok-* AND title:(pov OR \"a day\" OR walk OR city OR night)" + _NEW,
-     "max_items": 8, "tags": ["city", "vlog", "modern", "phone"]},
-    {"provider": "archive", "query": "identifier:instagram-*" + _NEW, "max_items": 10,
-     "tags": ["reels", "modern", "phone"]},
-    {"provider": "archive", "query": "identifier:twitter-* AND title:(dashcam OR cctv OR \"caught on\" OR footage OR \"right now\")" + _NEW,
-     "max_items": 8, "tags": ["news", "cctv", "modern"]},
     # Dailymotion search (public API); downloads need yt-dlp's impersonation extra, see README
     {"provider": "dailymotion", "query": "russian dashcam compilation", "max_items": 3, "tags": ["dashcam", "traffic", "modern"]},
     {"provider": "dailymotion", "query": "caught on dashcam", "max_items": 3, "tags": ["dashcam", "traffic", "modern"]},
