@@ -8,13 +8,18 @@ class AmbientGenerator {
   constructor(engine, params, rng) {
     this.e = engine;
     this.ctx = engine.ctx;
-    this.p = Object.assign({ root: 57, scale: 'minor', chordSeconds: [7, 11], pluck: 0.3, cutoff: 900, level: 0.5 }, params);
+    this.p = Object.assign({ root: 57, scale: 'minor', chordSeconds: [7, 11], pluck: 0.3, cutoff: 900, level: 0.5, style: 'pad', bpm: 72 }, params);
     this.rng = rng;
     this.degree = 0;
     this.nextChordAt = 0;
     this.nextPluckAt = 0;
+    this.nextBeatAt = 0;
+    this.beatIndex = 0;
+    this.chordMidis = [];
     this.nodes = [];
   }
+
+  get piano() { return this.p.style === 'piano'; }
 
   start() {
     const ctx = this.ctx;
@@ -22,7 +27,7 @@ class AmbientGenerator {
     this.out.gain.value = 0;
     this.filter = ctx.createBiquadFilter();
     this.filter.type = 'lowpass';
-    this.filter.frequency.value = this.p.cutoff;
+    this.filter.frequency.value = this.piano ? Math.max(this.p.cutoff, 2400) : this.p.cutoff;
     this.filter.Q.value = 0.7;
     this.delay = ctx.createDelay(2);
     this.delay.delayTime.value = 0.43;
@@ -41,6 +46,7 @@ class AmbientGenerator {
     this.out.gain.setTargetAtTime(this.p.level, ctx.currentTime, 2.0);
     this.nextChordAt = ctx.currentTime + 0.05;
     this.nextPluckAt = ctx.currentTime + 1.5;
+    this.nextBeatAt = ctx.currentTime + 0.4;
     this.timer = setInterval(() => this.schedule(), 200);
     this.schedule();
   }
@@ -51,6 +57,16 @@ class AmbientGenerator {
       const dur = this.rng.range(this.p.chordSeconds[0], this.p.chordSeconds[1]);
       this.playChord(this.nextChordAt, dur);
       this.nextChordAt += dur;
+    }
+    if (this.piano) {
+      // a slow, slightly drunk arpeggio over the chord: the sad-piano register of these edits
+      const beat = 60 / this.p.bpm;
+      while (this.nextBeatAt < now + 0.8) {
+        this.beatStep(this.nextBeatAt + this.rng.range(-0.015, 0.035));
+        this.nextBeatAt += beat * (this.beatIndex % 2 ? 1.1 : 0.9);
+        this.beatIndex++;
+      }
+      return;
     }
     while (this.nextPluckAt < now + 0.8) {
       if (this.rng.chance(this.p.pluck)) {
@@ -63,6 +79,46 @@ class AmbientGenerator {
     }
   }
 
+  beatStep(at) {
+    const i = this.beatIndex;
+    if (i % 16 >= 14 && this.rng.chance(0.5)) return;                   // breathe at the end of a phrase
+    const tones = this.chordMidis.length ? this.chordMidis : [this.p.root];
+    if (i % 4 === 0) this.pianoNote(at, tones[0] - 12, this.rng.range(0.18, 0.26), 3.2);   // bass
+    if (this.rng.chance(0.8)) {
+      const m = tones[(i + Math.floor(i / 4)) % tones.length] + (this.rng.chance(0.25) ? 12 : 0);
+      this.pianoNote(at + this.rng.range(0, 0.03), m, this.rng.range(0.1, 0.2), this.rng.range(1.6, 2.6));
+    }
+    if (i % 2 === 1 && this.rng.chance(0.3)) {                            // a melody note above
+      const scale = SCALES[this.p.scale];
+      const m = this.p.root + 24 + scale[this.rng.int(0, 6)];
+      this.pianoNote(at + this.rng.range(0.02, 0.08), m, this.rng.range(0.08, 0.16), this.rng.range(1.2, 2.0));
+    }
+  }
+
+  pianoNote(at, midi, vel, decay) {
+    this.e.emitOnsetAt(1.8, at);
+    const f = midiToFreq(midi);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(vel, at + 0.006);
+    g.gain.exponentialRampToValueAtTime(vel * 0.35, at + 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + decay);
+    g.connect(this.filter);
+    g.connect(this.send);
+    for (const [mult, amp, det] of [[1, 1, 0], [2, 0.45, 3], [3, 0.18, -2], [4, 0.06, 0]]) {
+      const o = this.ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f * mult;
+      o.detune.value = det;
+      const ag = this.ctx.createGain();
+      ag.gain.value = amp;
+      o.connect(ag);
+      ag.connect(g);
+      o.start(at);
+      o.stop(at + decay + 0.1);
+    }
+  }
+
   playChord(at, dur) {
     const scale = SCALES[this.p.scale];
     const walk = this.rng.pick([0, 2, 3, 4, 5]);
@@ -71,13 +127,15 @@ class AmbientGenerator {
     if (this.rng.chance(0.4)) notes.push(scale[(this.degree + 6) % 7] + 12 * Math.floor((this.degree + 6) / 7));
     const voices = notes.map((n, i) => this.p.root + n + (i === 0 ? -12 : 0));
     voices.push(this.p.root + notes[0] - 24);
+    this.chordMidis = notes.map((n) => this.p.root + n);
     this.e.emitOnsetAt(1.5, at);
+    const level = this.piano ? 0.035 : 0.09;   // under a piano the pad is just glue
     for (const m of voices) {
       const f = midiToFreq(m);
       const g = this.ctx.createGain();
       g.gain.setValueAtTime(0.0001, at);
-      g.gain.exponentialRampToValueAtTime(0.09, at + 2.2);
-      g.gain.setValueAtTime(0.09, at + dur - 0.5);
+      g.gain.exponentialRampToValueAtTime(level, at + 2.2);
+      g.gain.setValueAtTime(level, at + dur - 0.5);
       g.gain.exponentialRampToValueAtTime(0.0001, at + dur + 3.5);
       g.connect(this.filter);
       for (const det of [-6, 5]) {
@@ -197,6 +255,10 @@ export class AudioEngine {
 
   setClipGain(el, v) {
     if (el._ccGain) el._ccGain.gain.setTargetAtTime(v, this.now(), 0.04);
+  }
+
+  fadeClipGain(el, v, seconds) {
+    if (el._ccGain) el._ccGain.gain.setTargetAtTime(v, this.now(), Math.max(0.05, seconds / 3));
   }
 
   duck(target, tc = 0.25) {

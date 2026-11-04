@@ -80,8 +80,17 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 - **Player** (`web/player.js`): cuts on the AudioContext clock, cover-fits clips with a slow push-in,
   adds grain, vignette, flashes, letterboxing, shake, double exposure, freeze frames and captions, and
   lets strong music onsets pull a cut forward.
-- **Modes**: `corecore` (default), `hopecore` (warmer, quotes, no cut to black), `chaos` (the 2023
-  nichetok turn: layered, random speeds), `dwell` (long takes only).
+- **Modes**: `corecore` (default), `online` (contemporary material with a cinematic treatment: slow
+  motion and speed ramps, vlog jump cuts, sound bleeding across cuts, a piano bed), `hopecore` (warmer,
+  quotes, no cut to black), `chaos` (the 2023 nichetok turn: layered, random speeds, textures), `dwell`
+  (long takes only).
+- **Cinematic treatment**: every cycle picks a colour grade (cold, night, bleach, mono, warm, neutral:
+  filter, lifted blacks, tint, highlight bloom), speed ramps slow motion-heavy shots down and catch up
+  before the cut, a voice keeps talking under the next shot (L-cut), phone footage is shown whole over a
+  soft dark copy of itself instead of cropped, bursts occasionally stutter a moment two or three times,
+  and rare textures (low-res re-upload, chromatic aberration) mark the material as something that
+  travelled through the internet. Title cards on black use the sources' own titles. Frames: 16:9, 2.39:1
+  scope, 9:16, 1:1.
 - **Found text**: captions are drawn half the time from the source's own title ("a date with your
   family", "design for dreaming"), the rest from a small built-in pool or your own lines.
 - **Faces**: with `opencv-python-headless<5` installed, clips get a `faces` tag from a Haar cascade run
@@ -105,7 +114,7 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 | s | new seed |
 | l | live channel |
 | m | next mode |
-| v | toggle 16:9 / 9:16 |
+| v | cycle 16:9, 9:16, 2.39:1 |
 | x | ban the current clip (removed from the pool for good) |
 
 The URL carries `seed`, `mode`, `aspect`, `music` and `slowed`, so a link reproduces a stream over the same
@@ -138,12 +147,21 @@ Providers:
 - **Dailymotion** (`dailymotion`): public search API, no key; lots of dashcam compilations and odd uploads.
   Downloads go through yt-dlp, whose Dailymotion extractor needs its browser-impersonation extra
   (`pip install curl_cffi`); without it the job fails with that message.
+- **Reddit** (`reddit`): video posts from one or more subreddits (r/dashcam, r/oddlyterrifying,
+  r/liminalspace...) or a post URL. Needs a free Reddit "script" app: `REDDIT_CLIENT_ID` and
+  `REDDIT_CLIENT_SECRET`. The DASH video and audio tracks are fetched directly and merged with ffmpeg.
+  Untested from this side: Reddit refuses unauthenticated datacenter traffic, so it was built against the
+  documented API and a fixture.
+- **live streams** (`stream`): public HLS/RTSP/RTMP URLs (traffic cameras, harbour cams, city webcams),
+  one per line; ffmpeg records `CORECORE_STREAM_SECONDS` (default 90) of each and the slice is clipped like
+  any other source. Every recording is a new source, so the same camera can be recorded forever.
 - **local** (`local`): files in `media/inbox/`, or, from the CLI, any directory, file or glob. Over the API
   the provider only reads `media/inbox` and `CORECORE_LOCAL_ROOTS`. Originals are never deleted. The simplest
   contemporary workflow: download on your laptop with your own tools, drop the files here.
 
-Not available: Reddit's listings refuse unauthenticated datacenter traffic, and Wikimedia's API rate-limits
-shared addresses; both are on the roadmap behind credentials.
+Also in the contemporary set: the Archive's mirrored short-form uploads (78k TikToks, 11k Instagram reels,
+142k Twitter videos, identifiers `tiktok-*`, `instagram-*`, `twitter-*`), whose titles are the original
+captions, so hashtag words such as `grwm` or `dayinmylife` work as queries.
 
 A word on publishing: the archival set is public domain. Mirrored web video is other people's work; a
 private pool is one thing, a public site built from it is your call and your risk.
@@ -168,6 +186,8 @@ Environment variables, all optional:
 | `CORECORE_ARCHIVE_PAGE` | 1 | which page of Internet Archive results to take (CI rotates it weekly) |
 | `CORECORE_BLOCKLIST` | built-in list | extra comma-separated title words to drop; `off` disables the filter |
 | `CORECORE_LOCAL_ROOTS` | `media/inbox` | extra directories the local provider may read over the API (path-separator separated) |
+| `CORECORE_STREAM_SECONDS` | 90 | how much of a live stream the `stream` provider records per job |
+| `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` | | Reddit script-app credentials for the `reddit` provider |
 | `YTDLP_COOKIES_FROM_BROWSER`, `YTDLP_COOKIES_FILE`, `YTDLP_MAX_HEIGHT` | | yt-dlp options |
 
 ## API

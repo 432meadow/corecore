@@ -37,7 +37,7 @@
       <label>mode <select id="mode"></select></label>
       <div id="modeBlurb" class="blurb"></div>
       <label>seed <input id="seed" size="10"> <button id="reseed" type="button">new</button> <button id="live" type="button" title="l: everyone on this page sees the same edit at the same time">live</button></label>
-      <label>frame <select id="aspect"><option value="16:9">16:9</option><option value="9:16">9:16 (vertical)</option><option value="1:1">1:1</option></select></label>
+      <label>frame <select id="aspect"><option value="16:9">16:9</option><option value="2.39:1">2.39:1 (scope)</option><option value="9:16">9:16 (vertical)</option><option value="1:1">1:1</option></select></label>
       <label>music <select id="music"></select></label>
       <label class="inline"><input type="checkbox" id="slowed"> slowed + reverb (tracks only)</label>
       <label>volume <input type="range" id="volume" min="0" max="1" step="0.01" value="0.9"></label>
@@ -66,6 +66,8 @@
             <option value="archive">Internet Archive (public domain / CC)</option>
             <option value="ytdlp">yt-dlp (YouTube, TikTok + others; works from home)</option>
             <option value="dailymotion">Dailymotion search</option>
+            <option value="reddit">Reddit video posts (needs app credentials)</option>
+            <option value="stream">live stream recorder (HLS / RTSP URLs)</option>
             <option value="local">local files (media/inbox or a path)</option>
           </select>
         </label>

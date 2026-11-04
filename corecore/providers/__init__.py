@@ -18,9 +18,15 @@ def get_provider(name: str) -> Provider:
     if name in ("dailymotion", "dm"):
         from .dailymotion import DailymotionProvider
         return DailymotionProvider()
-    raise ProviderError(f"unknown provider {name!r} (use archive, ytdlp, dailymotion or local)")
+    if name in ("stream", "hls", "rtsp", "webcam"):
+        from .stream import StreamProvider
+        return StreamProvider()
+    if name in ("reddit",):
+        from .reddit import RedditProvider
+        return RedditProvider()
+    raise ProviderError(f"unknown provider {name!r} (use archive, ytdlp, dailymotion, reddit, stream or local)")
 
 
-PROVIDER_NAMES = ["archive", "ytdlp", "dailymotion", "local"]
+PROVIDER_NAMES = ["archive", "ytdlp", "dailymotion", "reddit", "stream", "local"]
 
 __all__ = ["Candidate", "Provider", "ProviderError", "get_provider", "PROVIDER_NAMES"]

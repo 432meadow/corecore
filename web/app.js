@@ -20,7 +20,7 @@ const state = {
   live: params.get('seed') === 'live',
   seed: params.get('seed') === 'live' ? liveSeed() : (params.get('seed') || randomSeed()),
   mode: MODES[params.get('mode')] ? params.get('mode') : 'corecore',
-  aspect: ['16:9', '9:16', '1:1'].includes(params.get('aspect')) ? params.get('aspect') : '16:9',
+  aspect: ['16:9', '9:16', '1:1', '2.39:1'].includes(params.get('aspect')) ? params.get('aspect') : '16:9',
   music: params.get('music') || 'generated',
   slowed: params.get('slowed') === '1',
   started: false,
@@ -66,7 +66,8 @@ function fillModes() {
 
 async function fillMusic() {
   const sel = $('#music');
-  sel.innerHTML = '<option value="generated">generated ambient (built in)</option>';
+  sel.innerHTML = '<option value="generated">generated (mode default)</option>'
+    + '<option value="ambient">generated ambient pad</option><option value="piano">generated piano</option>';
   try {
     let tracks = [];
     if (STATIC) {
@@ -89,8 +90,10 @@ async function fillMusic() {
 
 async function applyMusic() {
   if (!state.started) return;
-  if (state.music === 'generated') {
-    audio.startGenerated(MODES[state.mode].music, makeRng(`${state.seed}:music`));
+  if (['generated', 'ambient', 'piano'].includes(state.music)) {
+    const base = MODES[state.mode].music;
+    const style = state.music === 'generated' ? (base.style || 'pad') : state.music === 'piano' ? 'piano' : 'pad';
+    audio.startGenerated(Object.assign({}, base, { style }), makeRng(`${state.seed}:music`));
   } else {
     try {
       await audio.playFile(state.music, { slowed: state.slowed });
@@ -108,7 +111,7 @@ function setMode(name) {
   $('#modeBlurb').textContent = MODES[name].blurb;
   if (state.started) {
     player.flush();
-    if (state.music === 'generated') applyMusic();
+    if (['generated', 'ambient', 'piano'].includes(state.music)) applyMusic();
   }
   syncUrl();
   toast(`mode: ${MODES[name].label}`);
@@ -123,7 +126,7 @@ function setSeed(seed, { live = false } = {}) {
   player.snapEnabled = !live;
   if (state.started) {
     player.restart(live ? liveElapsed() : 0);
-    if (state.music === 'generated') applyMusic();
+    if (['generated', 'ambient', 'piano'].includes(state.music)) applyMusic();
   }
   syncUrl();
   toast(live ? 'live channel: everyone sees this edit right now' : `seed: ${seed}`);
@@ -332,7 +335,7 @@ function wire() {
     else if (k === 's') setSeed(randomSeed());
     else if (k === 'l') goLive();
     else if (k === 'x') player.banCurrent().then((id) => id && toast(`banned clip #${id}`));
-    else if (k === 'v') setAspect(state.aspect === '16:9' ? '9:16' : '16:9');
+    else if (k === 'v') setAspect({ '16:9': '9:16', '9:16': '2.39:1', '2.39:1': '16:9' }[state.aspect] || '16:9');
     else if (k === 'm') { const keys = Object.keys(MODES); setMode(keys[(keys.indexOf(state.mode) + 1) % keys.length]); }
   });
 

@@ -99,7 +99,8 @@ black) is this project's reading of that, stretched into a cycle that repeats fo
 | Captions | not core to corecore; central to hopecore | rare lowercase captions in corecore (6%), half of them the source's own title; italic serif quotes in hopecore |
 | The 2023 nonsense turn, nichetok | "unintelligible meme dumps", "pleasurable rush", "increasingly chaotic" | `chaos` mode: bursts first, random speeds, 35% layering, more letterboxing and flashes |
 | Hopecore | "positive stylistic offshoot" | `hopecore` mode: same phrases, warmer picks, quotes, light flashes, no cut to black |
-| Vertical format | TikTok | 9:16 frame option; clips are cover-fitted and panned |
+| Vertical format | TikTok | 9:16 frame option; in a wide frame, phone footage is shown whole over a blurred copy of itself |
+| Cinematic treatment of found material | the montage lineage (Jafa, Leckey) more than the feed | per-cycle colour grade, speed ramps, L-cuts, jump cuts, stutters, title cards, 2.39:1 scope frame |
 | Everyone watching the same feed | the genre is about the shared scroll | live channel: clock-derived seed, viewers fast-forward to the same cue |
 
 ## 4. Sources

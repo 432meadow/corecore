@@ -313,3 +313,29 @@ class ContemporaryTest(unittest.TestCase):
         from corecore import seeds
         self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "archival", "all"})
         self.assertTrue(all(j["provider"] in ("archive", "dailymotion") for j in seeds.CONTEMPORARY_JOBS))
+
+
+class NewProvidersTest(unittest.TestCase):
+    def test_stream_candidates(self):
+        from corecore.providers.stream import StreamProvider
+        cands = StreamProvider().search(None, "https://cam.example.org/live/index.m3u8\nrtsp://10.0.0.5/stream junk", 0)
+        self.assertEqual([c.url for c in cands], ["https://cam.example.org/live/index.m3u8", "rtsp://10.0.0.5/stream"])
+        self.assertEqual(cands[0].uploader, "cam.example.org")
+        with self.assertRaises(Exception):
+            StreamProvider().search("not a url", None, 1)
+
+    def test_reddit_needs_credentials_and_filters_posts(self):
+        from corecore.providers import reddit
+        os.environ.pop("REDDIT_CLIENT_ID", None)
+        with self.assertRaises(reddit.ProviderError):
+            reddit.RedditProvider().search("dashcam", None, 3)
+        posts = [
+            {"data": {"id": "a", "is_video": True, "over_18": False, "title": "dashcam near miss", "permalink": "/r/dashcam/comments/a/x/",
+                      "subreddit": "dashcam", "secure_media": {"reddit_video": {"fallback_url": "https://v.redd.it/abc/DASH_720.mp4?source=fallback", "duration": 20}}}},
+            {"data": {"id": "b", "is_video": True, "over_18": True, "title": "nope", "secure_media": {"reddit_video": {"fallback_url": "https://v.redd.it/b/DASH_720.mp4"}}}},
+            {"data": {"id": "c", "is_video": False, "title": "image post"}},
+        ]
+        cands = reddit._candidates_from_posts(posts, 0)
+        self.assertEqual([c.external_id for c in cands], ["a"])
+        self.assertEqual(cands[0].extra["video"], "https://v.redd.it/abc/DASH_720.mp4")
+        self.assertEqual(cands[0].uploader, "r/dashcam")

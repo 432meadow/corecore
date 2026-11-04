@@ -1,6 +1,7 @@
 // Canvas compositor + scheduler. Keeps a pool of <video> elements loading upcoming cues, cuts between
 // them on the AudioContext clock, and paints each frame with the corecore treatment.
 import { makeRng } from './prng.js';
+import { GRADES } from './sequencer.js';
 
 const POOL_SIZE = 8;
 const AHEAD = 5;
@@ -66,6 +67,7 @@ export class Player {
     this.showInfo = false;
     this.snapEnabled = true;
     this.waitingSince = null;
+    this.scratch = {};
     this.setAspect('16:9');
   }
 
@@ -74,7 +76,7 @@ export class Player {
 
   setAspect(a) {
     this.aspect = a;
-    const [w, h] = a === '9:16' ? [720, 1280] : a === '1:1' ? [900, 900] : [1280, 720];
+    const [w, h] = a === '9:16' ? [720, 1280] : a === '1:1' ? [900, 900] : a === '2.39:1' ? [1280, 536] : [1280, 720];
     this.canvas.width = w;
     this.canvas.height = h;
     this.buildOverlays();
@@ -107,6 +109,13 @@ export class Player {
     vx.fillStyle = g;
     vx.fillRect(0, 0, W, H);
     this.vignette = v;
+  }
+
+  scratchCanvas(name, w, h) {
+    let c = this.scratch[name];
+    if (!c) { c = document.createElement('canvas'); this.scratch[name] = c; }
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    return c;
   }
 
   initPool() {
@@ -277,6 +286,7 @@ export class Player {
     if (next.kind === 'clip') {
       const el = next.slot.el;
       this.audio.setClipGain(el, next.audio.clip || 0);
+      if (next.ramp) el.playbackRate = Math.max(0.1, Math.min(4, next.ramp.from));
       el.play().catch(() => {});
       if (next.fx.hold) next.holdAt = now + next.dur * 0.8;
     }
@@ -285,10 +295,15 @@ export class Player {
     if (prev?.fx?.flash?.at === 'end') this.flash(prev.fx.flash.strength);
     if (this.previous?.slot) { this.release(this.previous.slot); this.previous.slot = null; this.previous = null; }
     if (prev && prev.kind === 'clip' && prev.slot) {
-      const overlap = next.fadeIn > 0 ? next.fadeIn : (next.fx?.double ? next.dur : 0);
-      if (overlap > 0) {
+      const visual = next.fadeIn > 0 ? next.fadeIn : (next.fx?.double ? next.dur : 0);
+      // L-cut: a voice keeps talking under the next shot, fading out over the tail
+      const tail = prev.audio?.clip > 0 && next.audioTail > 0 ? next.audioTail : 0;
+      const keep = Math.max(visual, tail);
+      if (keep > 0) {
         this.previous = prev;
-        prev.releaseAt = now + overlap;
+        prev.drawUntil = now + visual;
+        prev.releaseAt = now + keep;
+        if (tail > 0) this.audio.fadeClipGain(prev.slot.el, 0, tail);
       } else {
         this.release(prev.slot);
         prev.slot = null;
@@ -336,6 +351,12 @@ export class Player {
       cur.slot.el.pause();
       cur.holdAt = null;
     }
+    if (cur?.kind === 'clip' && cur.ramp && cur.slot && !cur.slot.el.paused) {
+      const prog = Math.min(1, Math.max(0, (now - cur.start) / cur.dur));
+      const e = prog * prog * (3 - 2 * prog);
+      const rate = Math.max(0.1, Math.min(4, cur.ramp.from + (cur.ramp.to - cur.ramp.from) * e));
+      if (Math.abs(rate - cur.slot.el.playbackRate) > 0.03) cur.slot.el.playbackRate = rate;
+    }
     this.render(now);
   }
 
@@ -351,7 +372,7 @@ export class Player {
     if (c && c.kind === 'clip' && c.slot) {
       const p = this.previous;
       const fadeT = c.fadeIn > 0 ? Math.min(1, (now - c.start) / c.fadeIn) : 1;
-      if (p && p.slot && p.kind === 'clip') this.drawClip(p, now, 1);
+      if (p && p.slot && p.kind === 'clip' && now < (p.drawUntil ?? Infinity)) this.drawClip(p, now, 1);
       this.drawClip(c, now, c.fx.double ? 0.62 : fadeT);
     }
     ctx.restore();
@@ -381,11 +402,21 @@ export class Player {
     const zoom = cue.zoom.from + (cue.zoom.to - cue.zoom.from) * e;
     const { vx, vy, vw, vh } = this.viewport(cue);
     const iw = el.videoWidth || 16, ih = el.videoHeight || 9;
-    const scale = Math.max(vw / iw, vh / ih) * zoom;
-    const dw = iw * scale, dh = ih * scale;
-    const ox = (dw - vw) / 2, oy = (dh - vh) / 2;
-    let dx = vx - ox - cue.pan.x * ox;
-    let dy = vy - oy - cue.pan.y * oy;
+    // phone footage in a wide frame: shown whole over a soft dark copy of itself, not cropped to a sliver
+    const blurFit = cue.fit === 'blur' && ih / iw > (vh / vw) * 1.2;
+    let dx, dy, dw, dh;
+    if (blurFit) {
+      const scale = (vh / ih) * zoom;
+      dw = iw * scale; dh = ih * scale;
+      dx = vx + (vw - dw) / 2;
+      dy = vy + (vh - dh) / 2 - cue.pan.y * (dh - vh) / 2;
+    } else {
+      const scale = Math.max(vw / iw, vh / ih) * zoom;
+      dw = iw * scale; dh = ih * scale;
+      const ox = (dw - vw) / 2, oy = (dh - vh) / 2;
+      dx = vx - ox - cue.pan.x * ox;
+      dy = vy - oy - cue.pan.y * oy;
+    }
     if (cue.fx.shake) {
       dx += (this.fxRng.next() * 2 - 1) * cue.fx.shake;
       dy += (this.fxRng.next() * 2 - 1) * cue.fx.shake;
@@ -395,19 +426,69 @@ export class Player {
     ctx.rect(vx, vy, vw, vh);
     ctx.clip();
     const f = this.sequencer.params.fx || {};
+    const g = GRADES[cue.grade] || GRADES.neutral;
     const filters = [];
     if (cue.fx.bw) filters.push('grayscale(1)');
     else if (f.desat) filters.push(`saturate(${(1 - f.desat).toFixed(2)})`);
     if (f.contrast && f.contrast !== 1) filters.push(`contrast(${f.contrast})`);
-    if (filters.length && 'filter' in ctx) ctx.filter = filters.join(' ');
+    if (g.filter) filters.push(g.filter);
+    const filterStr = 'filter' in ctx ? filters.join(' ') : '';
     ctx.globalAlpha = alpha;
-    try { ctx.drawImage(el, dx, dy, dw, dh); } catch (err) { /* decoder hiccup; skip frame */ }
+    if (blurFit) {
+      const bg = this.scratchCanvas('bg', 160, 90);
+      const bx = bg.getContext('2d');
+      bx.filter = 'blur(6px) brightness(0.45)';
+      try { bx.drawImage(el, 0, 0, 160, 90); } catch (err) { /* skip */ }
+      bx.filter = 'none';
+      if (filterStr) ctx.filter = filterStr;
+      ctx.drawImage(bg, vx, vy, vw, vh);
+    }
+    if (filterStr) ctx.filter = filterStr;
+    try {
+      if (cue.fx.pixelate > 1) {
+        // the re-uploaded-at-240p texture: render small, scale up without smoothing
+        const k = cue.fx.pixelate;
+        const pw = Math.max(16, Math.round(vw / k)), ph = Math.max(9, Math.round(vh / k));
+        const pix = this.scratchCanvas('pix', pw, ph);
+        const px = pix.getContext('2d');
+        px.clearRect(0, 0, pw, ph);
+        px.drawImage(el, (dx - vx) / k, (dy - vy) / k, dw / k, dh / k);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(pix, vx, vy, vw, vh);
+        ctx.imageSmoothingEnabled = true;
+      } else {
+        ctx.drawImage(el, dx, dy, dw, dh);
+      }
+    } catch (err) { /* decoder hiccup; skip frame */ }
+    ctx.filter = 'none';
+    if (cue.fx.aberration > 0 && alpha >= 1) this.aberrate(vx, vy, vw, vh, cue.fx.aberration);
     ctx.restore();
+  }
+
+  // Chromatic aberration without per-pixel work: the frame split into a red copy and a cyan copy,
+  // offset in opposite directions and added back together.
+  aberrate(vx, vy, vw, vh, k) {
+    const ctx = this.ctx;
+    const a = this.scratchCanvas('abA', vw, vh), b = this.scratchCanvas('abB', vw, vh);
+    for (const [c, color] of [[a, '#ff0000'], [b, '#00ffff']]) {
+      const cx = c.getContext('2d');
+      cx.globalCompositeOperation = 'source-over';
+      cx.drawImage(this.canvas, vx, vy, vw, vh, 0, 0, vw, vh);
+      cx.globalCompositeOperation = 'multiply';
+      cx.fillStyle = color;
+      cx.fillRect(0, 0, vw, vh);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(a, vx - k, vy);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(b, vx + k, vy);
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   drawOverlays(now, c) {
     const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
-    const grain = c?.fx?.grain ?? 0.08;
+    const g = GRADES[c?.grade] || GRADES.neutral;
+    const grain = (c?.fx?.grain ?? 0.08) * (g.grain ?? 1);
     const vig = c?.fx?.vignette ?? 0.45;
     if (grain > 0 && this.noise.length) {
       const tile = this.noise[Math.floor(this.fxRng.next() * this.noise.length)];
@@ -418,6 +499,37 @@ export class Player {
       ctx.translate(-ox, -oy);
       ctx.fillStyle = tile.pattern;
       ctx.fillRect(0, 0, W + 256, H + 256);
+      ctx.restore();
+    }
+    if (c?.kind === 'clip') {
+      // the grade lives inside the picture; letterbox bars stay black
+      const { vx, vy, vw, vh } = this.viewport(c);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(vx, vy, vw, vh);
+      ctx.clip();
+      if (g.lift > 0) {   // lifted blacks: nothing in the picture is ever quite black
+        ctx.globalCompositeOperation = 'lighten';
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = `rgb(${g.lift},${g.lift},${g.lift})`;
+        ctx.fillRect(vx, vy, vw, vh);
+      }
+      if (g.tint && g.tintAlpha > 0) {
+        ctx.globalCompositeOperation = g.tintBlend || 'soft-light';
+        ctx.globalAlpha = g.tintAlpha;
+        ctx.fillStyle = g.tint;
+        ctx.fillRect(vx, vy, vw, vh);
+      }
+      if (g.bloom > 0) {   // highlights bleed a little, from a tiny blurred copy of the picture
+        const bl = this.scratchCanvas('bloom', 160, 90);
+        const bx = bl.getContext('2d');
+        bx.filter = 'blur(4px) brightness(1.1) contrast(1.3)';
+        bx.drawImage(this.canvas, vx, vy, vw, vh, 0, 0, 160, 90);
+        bx.filter = 'none';
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = g.bloom;
+        ctx.drawImage(bl, vx, vy, vw, vh);
+      }
       ctx.restore();
     }
     if (vig > 0 && this.vignette) {
@@ -440,21 +552,25 @@ export class Player {
   drawText(c, now) {
     const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
     const t = now - c.start;
-    const a = Math.min(1, t / 0.4) * Math.min(1, Math.max(0, (c.end - now) / 0.3));
+    const title = c.text.style === 'title';
+    const fadeIn = title ? 0.7 : 0.4, fadeOut = title ? 0.6 : 0.3;
+    const a = Math.min(1, t / fadeIn) * Math.min(1, Math.max(0, (c.end - now) / fadeOut));
     const s = Math.min(W, H) / 720;
     ctx.save();
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(0,0,0,0.85)';
-    ctx.shadowBlur = 14 * s;
-    ctx.fillStyle = '#fff';
+    ctx.shadowBlur = title ? 0 : 14 * s;
+    ctx.fillStyle = title ? '#d8d8d8' : '#fff';
     const quote = c.text.style === 'quote';
     ctx.font = quote ? `italic ${Math.round(36 * s)}px Georgia, "Times New Roman", serif`
-      : `500 ${Math.round(26 * s)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+      : title ? `300 ${Math.round(22 * s)}px Georgia, "Times New Roman", serif`
+        : `500 ${Math.round(26 * s)}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+    if (title && 'letterSpacing' in ctx) ctx.letterSpacing = '0.2em';
     const lines = this.wrap(ctx, c.text.str, W * 0.78);
-    const lh = (quote ? 46 : 34) * s;
-    const y0 = quote ? H / 2 - (lines.length - 1) * lh / 2 : H * 0.84 - (lines.length - 1) * lh;
+    const lh = (quote ? 46 : title ? 34 : 34) * s;
+    const y0 = quote || title ? H / 2 - (lines.length - 1) * lh / 2 : H * 0.84 - (lines.length - 1) * lh;
     lines.forEach((line, i) => ctx.fillText(line, W / 2, y0 + i * lh));
     ctx.restore();
   }
