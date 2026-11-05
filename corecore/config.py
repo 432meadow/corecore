@@ -77,6 +77,9 @@ _DEFAULT_BLOCKLIST = [
     "violence", "violent", "brutal", "beaten", "beating", "beat up", "beats up", "beat him", "stomp", "stomps",
     "stomped", "stomping", "punch", "punched", "punches", "punching", "slap", "slapped", "slaps", "rioters",
     "died suddenly", "republican", "republicans", "democrat", "democrats", "j6",
+    # forms the whole-word match does not catch, found while scouting the YouTube and Twitter mirrors: a
+    # racist knifepoint-murder post, an antisemitic upload, a promo naming "@Pornhub"
+    "murdered", "murders", "murderer", "murderers", "rapes", "raped", "raping", "rapist", "abusive", "pornhub",
 ]
 _env_block = os.environ.get("CORECORE_BLOCKLIST", "")
 BLOCKLIST: list[str] = [] if _env_block.strip().lower() == "off" else (
@@ -110,6 +113,12 @@ _DEFAULT_BLOCKED_UPLOADERS = [
     "ray garcia", "diedsuddenly", "the lincoln project", "theblaze", "newsmax", "heartland signal", "andy ngô",
     "andy ngo", "disclose tv", "t greg doucette", "the sun", "investigation discovery", "the intercept",
     "mumeixxx",
+    # found while scouting for social clips, vlogs and weird happenings: porn and fetish accounts, and
+    # channels that film minors (teenagers on beaches, with "bikini" spelled in Greek letters to pass the
+    # filter; children in leotards; school-uniform "facts"), hate accounts, an account selling sex videos
+    "jonathan harker", "ginnastica san biagio", "holly lolly", "peach farmer", "velvet tube", "toplesstopics",
+    "dessousforyou", "nick & lins", "pornhuber", "hspcollectionx", "ccgirl42", "subgirl__0831", "jay_marish",
+    "beatthezog", "owen benjamin",
 ]
 
 
@@ -127,6 +136,10 @@ BLOCKED_UPLOADERS: set[str] = set() if _env_up.strip().lower() == "off" else (
 BANNED_SOURCES: set[str] = {
     "archive:twitter-1295991588083163136",   # a raccoon kicked in the street at night
     "archive:TikTok-7130942596586818818",    # a clip that frames its subject as a schoolchild, sexually
+    "archive:youtube--4CressilIo",           # a mass murderer's vlog
+    "archive:youtube-2XcsnSgNTIw",           # a child, drunk, with men
+    "archive:youtube-OrlB86mLvjo",           # a racist post about a knifepoint murder
+    "archive:youtube-GF1QocDmt9Y",           # an antisemitic upload
 }
 
 
