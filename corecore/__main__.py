@@ -43,6 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--skip-ingest", action="store_true", dest="skip_ingest")
     p.add_argument("--set", default="contemporary", choices=["contemporary", "archival", "all"], dest="seed_set")
     p.add_argument("--tags", default="", help="export only clips with at least one of these comma-separated tags")
+    p.add_argument("--min-clips", type=int, default=0, dest="min_clips",
+                   help="if the pool holds fewer clips than this, scrape for --fallback-budget seconds even when --time-budget is 0")
+    p.add_argument("--fallback-budget", type=float, default=1200, dest="fallback_budget")
 
     sub.add_parser("tag-faces", help="(re)run face detection over the pool; needs opencv-python-headless")
     sub.add_parser("worker", help="run only the ingest worker (drain queued jobs)")
@@ -86,8 +89,17 @@ def main(argv: list[str] | None = None) -> int:
         from .export import export_site
         if args.cmd == "build-site" and not args.skip_ingest:
             from .jobs import run_starter_jobs
-            summary = run_starter_jobs(args.time_budget, echo=lambda m: print(f"  {m}"), seed_set=args.seed_set)
-            print(f"ingest: {summary}")
+            budget = args.time_budget
+            with db.connect() as conn:
+                have = db.stats(conn)["clips"]
+            if budget <= 0 and args.min_clips and have < args.min_clips:
+                print(f"pool holds {have} clips (< {args.min_clips}); scraping for {args.fallback_budget:.0f}s")
+                budget = args.fallback_budget
+            if budget > 0:
+                summary = run_starter_jobs(budget, echo=lambda m: print(f"  {m}"), seed_set=args.seed_set)
+                print(f"ingest: {summary}")
+            else:
+                print(f"ingest skipped: pool holds {have} clips")
         result = export_site(args.out, height=args.height, max_bytes=int(args.max_mb * 1024 * 1024), max_clips=args.max_clips,
                              tags=[t for t in args.tags.split(",") if t.strip()] or None)
         print(result)

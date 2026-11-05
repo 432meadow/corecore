@@ -72,8 +72,15 @@ jobs:
           SET="${{ github.event.inputs.seed_set || 'contemporary' }}"
           # the cached pool may hold both sets; the contemporary site only publishes clips tagged modern
           TAGS=""; if [ "$SET" = "contemporary" ]; then TAGS="--tags modern"; fi
+          # a push deploys code changes from the cached pool in minutes; scraping happens on the weekly
+          # schedule and on manual runs (or when the cache turns out to be thin)
+          case "${{ github.event_name }}" in
+            push) BUDGET=0 ;;
+            schedule) BUDGET=2400 ;;
+            *) BUDGET="${{ github.event.inputs.time_budget || '2400' }}" ;;
+          esac
           python -m corecore build-site --out site --set "$SET" $TAGS \
-            --time-budget "${{ github.event.inputs.time_budget || '2400' }}" \
+            --time-budget "$BUDGET" --min-clips 200 --fallback-budget 1500 \
             --max-mb "${{ github.event.inputs.max_mb || '600' }}"
           python -m corecore stats
           du -sh site
