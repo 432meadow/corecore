@@ -8,7 +8,7 @@ import threading
 import time
 from typing import Callable
 
-from . import db
+from . import config, db
 from .ingest import ingest_candidate
 from .providers import ProviderError, get_provider
 
@@ -113,14 +113,28 @@ def run_job(job_id: int, echo: Callable[[str], None] | None = None, deadline: fl
     _update(job_id, status="done", progress=1.0, clips_added=added, message=f"done: {added} clips added")
 
 
+def _cursor_file():
+    return config.MEDIA_DIR / "starter_cursor.json"
+
+
 def run_starter_jobs(time_budget: float, echo: Callable[[str], None] | None = None, seed_set: str = "contemporary") -> dict:
-    """Run a curated starter list in the foreground within a time budget (used by `build-site` and CI)."""
+    """Run a curated starter list in the foreground within a time budget (used by `build-site` and CI).
+
+    Each run picks up where the last one stopped: the cursor is kept with the pool, so a list longer than
+    one budget is worked through over successive runs instead of its tail never running."""
+    import json
     from . import seeds
 
     jobs_list = seeds.SEED_SETS.get(seed_set, seeds.STARTER_JOBS)
+    try:
+        cursors = json.loads(_cursor_file().read_text())
+    except (OSError, ValueError):
+        cursors = {}
+    start = int(cursors.get(seed_set, 0)) % len(jobs_list) if jobs_list else 0
+    order = jobs_list[start:] + jobs_list[:start]
     deadline = time.monotonic() + time_budget
-    summary = {"jobs": 0, "clips": 0, "stopped_early": False, "set": seed_set}
-    for j in jobs_list:
+    summary = {"jobs": 0, "clips": 0, "stopped_early": False, "set": seed_set, "from_job": start}
+    for j in order:
         if time.monotonic() > deadline:
             summary["stopped_early"] = True
             break
@@ -132,6 +146,12 @@ def run_starter_jobs(time_budget: float, echo: Callable[[str], None] | None = No
             row = conn.execute("SELECT clips_added FROM jobs WHERE id = ?", (job_id,)).fetchone()
         summary["jobs"] += 1
         summary["clips"] += int(row["clips_added"] or 0)
+    if jobs_list:
+        cursors[seed_set] = (start + summary["jobs"]) % len(jobs_list)
+        try:
+            _cursor_file().write_text(json.dumps(cursors))
+        except OSError:
+            pass
     return summary
 
 

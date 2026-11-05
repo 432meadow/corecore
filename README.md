@@ -158,7 +158,9 @@ Three starter sets, one switch (`--set contemporary|beauty|archival|all`, or the
   own camera work in Yellowstone and Arches (wolves, bison in snow, morning fog, a sunrise), Flickr's
   wildlife, light, water and home clips (herons, owls, fledglings, sunsets, fog, waves, rain on a window,
   sledding, first snow), the wildlife and land agencies' rivers and creatures, nature centres' trail
-  cameras, nest boxes and osprey cams, the Brooks Falls bear cam, public pianos. Title searches on the
+  cameras, nest boxes and osprey cams, the Brooks Falls bear cam, public pianos, buskers, the 2005-06
+  camcorder years of Ourmedia (first steps, birthdays, grandparents), gardens and farms, rain, snowfall,
+  lighthouses and lit windows, Grand Canyon b-roll, aquarium tanks. Title searches on the
   YouTube mirror were tried first and found games, manga dubs and news for innocent words, so they are
   gone from this set. Tagged `beauty`, `kind`, `light`, `trailcam`, so the sequencer can cut kindness
   against traffic and beauty against screens; `hopecore` prefers them.
