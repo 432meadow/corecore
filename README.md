@@ -143,8 +143,13 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 | v | cycle 16:9, 9:16, 1:1, 2.39:1 |
 | x | ban the current clip (removed from the pool for good) |
 
-The URL carries `seed`, `mode`, `aspect`, `tags`, `edge` and `clipfx`, so a link reproduces a stream over
-the same pool; `[ share this stream ]` in the controls copies it. The viewer itself carries no text: the
+The URL carries `seed`, `mode`, `tags`, `edge` and `clipfx`, and `aspect` once a frame has been chosen, so
+a link reproduces a stream over the same pool; `[ share this stream ]` in the controls copies it.
+
+**On a phone.** The picture opens in the vertical frame (9:16) and follows the phone as it turns, until a
+frame is chosen by hand. A tap on the picture opens and closes the controls, which rise as a sheet over the
+lower part of the screen with the picture still in view above; every word in brackets is a 44 px target,
+and `[ pause ]` stands in for the space bar. On a computer a click on the picture does the same. The viewer itself carries no text: the
 status line (mode · seed · state) and the source of the clip on screen sit at the top of the controls.
 
 **The look.** The controls wear the elsewhere look: Roboto or Helvetica at 16, 14 and 13 px and one

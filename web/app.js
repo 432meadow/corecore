@@ -18,6 +18,11 @@ const randomSeed = () => Math.random().toString(36).slice(2, 8);
 
 const EDGE_DEFAULT = 1;   // the fader at its fullest on load: the small, soft picture
 const ASPECTS = ['16:9', '9:16', '1:1', '2.39:1'];
+// A phone: a touch screen whose short side is phone-sized. It gets the vertical frame while held upright,
+// and follows the phone as it turns, until a frame is chosen by hand.
+const PHONE = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 600;
+const UPRIGHT = matchMedia('(orientation: portrait)');
+const defaultAspect = () => (PHONE && UPRIGHT.matches ? '9:16' : '16:9');
 const CLIPFX = { speaker: 'through computer speakers', phone: 'through a phone', direct: 'direct' };
 const PROVIDERS = { archive: 'internet archive', ytdlp: 'yt-dlp', dailymotion: 'dailymotion', reddit: 'reddit', stream: 'a stream', local: 'local files' };
 
@@ -25,7 +30,8 @@ const state = {
   live: params.get('seed') === 'live',
   seed: params.get('seed') === 'live' ? liveSeed() : (params.get('seed') || randomSeed()),
   mode: MODES[params.get('mode')] ? params.get('mode') : 'corecore',
-  aspect: ASPECTS.includes(params.get('aspect')) ? params.get('aspect') : '16:9',
+  aspect: ASPECTS.includes(params.get('aspect')) ? params.get('aspect') : defaultAspect(),
+  aspectChosen: ASPECTS.includes(params.get('aspect')),   // a frame picked by hand (or in a shared link) stays put
   tags: (params.get('tags') || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
   edge: params.has('edge') ? Math.max(0, Math.min(1, Number(params.get('edge')) || 0)) : EDGE_DEFAULT,
   clipfx: Object.keys(CLIPFX).includes(params.get('clipfx')) ? params.get('clipfx') : 'speaker',
@@ -126,7 +132,8 @@ function setTheme(t) {
 }
 
 function syncUrl() {
-  const p = new URLSearchParams({ seed: state.live ? 'live' : state.seed, mode: state.mode, aspect: state.aspect });
+  const p = new URLSearchParams({ seed: state.live ? 'live' : state.seed, mode: state.mode });
+  if (state.aspectChosen) p.set('aspect', state.aspect);   // otherwise each screen opens a link in its own frame
   if (state.tags.length) p.set('tags', state.tags.join(','));
   if (state.edge !== EDGE_DEFAULT) p.set('edge', String(state.edge));
   if (state.clipfx !== 'speaker') p.set('clipfx', state.clipfx);
@@ -176,12 +183,20 @@ function checkLive() {
   if (state.live && state.started && liveSeed() !== state.seed) setSeed(liveSeed(), { live: true });
 }
 
-function setAspect(a) {
+function setAspect(a, { chosen = true } = {}) {
   state.aspect = a;
+  state.aspectChosen = state.aspectChosen || chosen;
   light($('#aspects'), a);
   player.setAspect(a);
   syncUrl();
   status(a, 1600);
+}
+
+function togglePause() {
+  if (!state.started) return;
+  if (player.paused) player.resume(); else player.pause();
+  rename($('#pause'), player.paused ? 'play' : 'pause', player.paused ? 'Play the stream again' : 'Pause the stream');
+  status('', 0);
 }
 
 function setClipFx(v) {
@@ -312,8 +327,9 @@ async function toggleRecord() {
 }
 
 function toggleFullscreen() {
+  if (!document.fullscreenEnabled) { say($('#fullscreen'), 'fullscreen — not on this device', 4000); return; }
   if (document.fullscreenElement) document.exitFullscreen();
-  else document.documentElement.requestFullscreen().catch(() => {});
+  else document.documentElement.requestFullscreen().catch(() => say($('#fullscreen'), 'fullscreen — refused', 4000));
 }
 
 async function banCurrent(btn) {
@@ -382,6 +398,12 @@ function wire() {
   syncUrl();
 
   $('#start').addEventListener('click', start);
+  // a tap or click on the picture opens and closes the controls: the viewer carries no text, so this is
+  // the way in on a phone, which has no keys
+  canvas.addEventListener('click', () => { if (state.started) setHud($('#hud').classList.contains('hidden')); });
+  if (PHONE) UPRIGHT.addEventListener('change', () => { if (!state.aspectChosen) setAspect(defaultAspect(), { chosen: false }); });
+  if (matchMedia('(pointer: coarse)').matches) $('#hint').textContent = 'tap the picture for the controls. sound on.';
+  $('#pause').addEventListener('click', togglePause);
   $('#splash').addEventListener('click', (e) => { if (e.target.id !== 'start') start(); });
   $('#reseed').addEventListener('click', () => setSeed(randomSeed()));
   $('#live').addEventListener('click', () => (state.live ? setSeed(randomSeed()) : goLive()));
@@ -430,7 +452,7 @@ function wire() {
     const k = e.key.toLowerCase();
     if ((k === ' ' || k === 'enter') && e.target.matches('button, summary, a')) return;   // the focused control takes it
     if (!state.started && (k === ' ' || k === 'enter')) { start(); return; }
-    if (k === ' ') { e.preventDefault(); player.paused ? player.resume() : player.pause(); status('', 1600); }
+    if (k === ' ') { e.preventDefault(); togglePause(); }
     else if (k === 'n') { player.nextPhrase(); status('next phrase', 1200); }
     else if (k === '.') player.skip();
     else if (k === 'h') setHud($('#hud').classList.contains('hidden'));

@@ -20,7 +20,7 @@
       <h1>absolute clarity</h1>
       <p class="g">an endless found-footage montage. sound on.</p>
       <button id="start" class="act begin" aria-label="Begin the montage">[ begin ]</button>
-      <p class="hint g">space pause · n next phrase · h controls · i info · f fullscreen · r record · s reseed · l live channel · m mode · v frame · x ban clip</p>
+      <p class="hint g" id="hint">space pause · n next phrase · h or a click on the picture for the controls · i info · f fullscreen · r record · s reseed · l live channel · m mode · v frame · x ban clip</p>
     </div>
   </div>
 
@@ -65,6 +65,7 @@
 
     <h3 class="sect">acts</h3>
     <div class="inline"><div class="seg">
+      <button id="pause" type="button" class="act" aria-label="Pause the stream">[ pause ]</button>
       <button id="next" type="button" class="act" aria-label="Skip to the next phrase">[ next phrase ]</button>
       <button id="ban" type="button" class="act" aria-label="Ban the clip on screen from the pool">[ ban this clip ]</button>
       <button id="info" type="button" class="switch" role="switch" aria-checked="false" aria-label="Show what the stream is doing">[ info ]</button>
