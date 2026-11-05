@@ -94,6 +94,9 @@ input[type="range"]:focus-visible { outline: 1px solid var(--focus); outline-off
 .field.short { display: inline-block; width: auto; }
 .field.short input { width: 120px; }
 
+/* the static edition has no scraper behind it: the ingest form stays out of sight there */
+body.static #ingest { display: none; }
+
 /* the controls, a column at the side with one line between it and the picture */
 #hud { position: fixed; top: 0; right: 0; height: 100vh; width: min(440px, 100vw); overflow-y: auto; background: var(--bg); border-left: 1px solid var(--rule); padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px)); z-index: 25; }
 #hud .head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }

@@ -64,7 +64,7 @@ _DEFAULT_BLOCKLIST = [
     # so they are dropped wherever a title or an uploader name carries them. Game clips are not here: they
     # are a theme of the contemporary set; the beauty queries exclude them themselves.
     "gacha", "vtuber", "mmd", "manga", "anime", "dub", "dubbed", "cartoon", "south park", "family guy", "simpsons",
-    "news", "newsflash", "breaking", "politics", "political", "election", "campaign", "senator", "congress",
+    "news", "newsflash", "newsreel", "skynews", "sky news", "star fox", "breaking", "politics", "political", "election", "campaign", "senator", "congress",
     "governor", "president", "trump", "biden", "clinton", "obama", "dnc", "gop", "maga", "lobbyists",
     "dossier", "fbi", "cia", "bomb", "protest", "protesters", "rally", "riot", "riots", "gaza", "hamas",
     "hezbollah", "idf", "israel", "israeli", "palestine", "palestinian", "zionist",

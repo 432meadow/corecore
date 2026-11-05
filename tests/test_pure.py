@@ -305,6 +305,8 @@ class ContemporaryTest(unittest.TestCase):
             self.assertFalse(config.blocked_title(fine), fine)
         # the uploader counts too: a channel called "... News", or an account on the blocked list
         self.assertTrue(config.blocked_source("Cute kitten runs to police", "Breitbart News"))
+        self.assertTrue(config.blocked_source("Police are examining CCTV footage", "SkyNews"))
+        self.assertTrue(config.blocked_title("Star Fox - Corneria Full Level Gameplay"))
         self.assertTrue(config.blocked_source("We grilled a dog outside a BBQ spot", "officialpeta"))
         self.assertFalse(config.blocked_source("We grilled a dog outside a BBQ spot", "a neighbour"))
         self.assertFalse(config.blocked_source("Snow on the allotment", None))
