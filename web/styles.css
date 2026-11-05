@@ -125,7 +125,7 @@ details li { margin: 0 0 4px; }
   .ctl { padding: 8px 0 4px; }
   .ctl .row2 { margin-bottom: 0; }
   .field input, .field textarea { padding: 10px 0; }
-  details summary { padding: 10px 0; }
+  details summary { display: flex; align-items: center; min-height: 44px; padding: 0; }
 }
 
 /* on a phone the controls are a sheet over the lower part of the picture, which stays in view above; the
