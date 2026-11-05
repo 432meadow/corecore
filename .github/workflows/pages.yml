@@ -28,7 +28,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.event_name }}   # manual scrapes and push builds queue separately; a push no longer replaces a pending dispatch
   cancel-in-progress: false   # a push queues behind a running build instead of cancelling a 40-minute scrape
 
 jobs:
