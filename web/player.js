@@ -527,10 +527,20 @@ export class Player {
     this.drawOverlays(now, c);
   }
 
+  // In a 16:9 or 1:1 frame a portrait clip fills the frame edge to edge, cropped: no blurred sides and no
+  // letterbox bars, which would leave a phone clip a sliver. A 2.39:1 frame still shows it whole, since a
+  // fill there would keep only a quarter of its height.
+  fillsFrame(cue) {
+    if (this.aspect !== '16:9' && this.aspect !== '1:1') return false;
+    const el = cue.slot?.el;
+    const w = el?.videoWidth || cue.clip?.width, h = el?.videoHeight || cue.clip?.height;
+    return !!(w && h && h > w);
+  }
+
   viewport(cue) {
     const W = this.canvas.width, H = this.canvas.height;
     let vx = 0, vy = 0, vw = W, vh = H;
-    const lb = cue.fx?.letterbox;
+    const lb = this.fillsFrame(cue) ? null : cue.fx?.letterbox;
     if (lb === '4:3') {
       if (W >= H) { vw = Math.min(W, Math.round(H * 4 / 3)); vx = Math.round((W - vw) / 2); }
       else { vh = Math.min(H, Math.round(W * 3 / 4)); vy = Math.round((H - vh) / 2); }
@@ -551,7 +561,8 @@ export class Player {
     const { vx, vy, vw, vh } = this.viewport(cue);
     const iw = el.videoWidth || 16, ih = el.videoHeight || 9;
     // phone footage in a wide frame: shown whole over a soft dark copy of itself, not cropped to a sliver
-    const blurFit = cue.fit === 'blur' && ih / iw > (vh / vw) * 1.2;
+    const fill = this.fillsFrame(cue);
+    const blurFit = cue.fit === 'blur' && !fill && ih / iw > (vh / vw) * 1.2;
     let dx, dy, dw, dh;
     if (blurFit) {
       const scale = (vh / ih) * zoom;
@@ -562,8 +573,10 @@ export class Player {
       const scale = Math.max(vw / iw, vh / ih) * zoom;
       dw = iw * scale; dh = ih * scale;
       const ox = (dw - vw) / 2, oy = (dh - vh) / 2;
+      // a phone clip cropped to a wide frame keeps its upper middle, where the faces usually are
+      const py = fill ? Math.max(-1, Math.min(1, cue.pan.y * 0.6 - 0.22)) : cue.pan.y;
       dx = vx - ox - cue.pan.x * ox;
-      dy = vy - oy - cue.pan.y * oy;
+      dy = vy - oy - py * oy;
     }
     if (cue.fx.shake) {
       dx += (this.fxRng.next() * 2 - 1) * cue.fx.shake;
