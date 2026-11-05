@@ -139,6 +139,17 @@ class HardBlockTest(unittest.TestCase):
         self.assertTrue(config.blocked_title("Except dog crap. And violence. And Champ."))
         self.assertFalse(config.blocked_source("Kitten Wrasslin' on the bed", "Nina Paley"))
 
+    def test_put_back_sources_are_not_banned(self):
+        from corecore import seeds
+        idents = {f"{j['provider']}:{j['url'].rsplit('/', 1)[-1]}" for j in seeds.REINSTATED}
+        self.assertFalse(idents & config.BANNED_SOURCES)
+        self.assertTrue(all("modern" in j["tags"] for j in seeds.REINSTATED))
+        for title, uploader in (("Una 'dashcam' graba el momento exacto en que cae un proyectil en Ucrania", "el OJO en"),
+                                ("Suspect Crashes into Police Cruisers & Attempts To Flee (Dashcam Video)", "Law&Crime Network"),
+                                ("A Plane Hit the Pentagon, Baby Steps for the Parrots of Loose Change etc", "Ryan Dawson Fan"),
+                                ("IRAN STRIKES 6 AIRCRAFT IN 24 HOURS", "Jackson Hinkle Official")):
+            self.assertFalse(config.blocked_source(title, uploader), title)
+
     def test_audit_removes_hitler_footage_from_the_pool(self):
         from corecore import audit as audit_mod, seeds
         with db.connect() as conn:

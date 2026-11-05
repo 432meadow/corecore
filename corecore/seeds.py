@@ -71,6 +71,8 @@ CONTEMPORARY_JOBS = [
      "max_items": 8, "tags": ["animals", "home", "modern", "phone"]},
     {"provider": "archive", "query": "identifier:tiktok-* AND title:(pov OR \"a day\" OR walk OR city OR night)" + _NEW,
      "max_items": 8, "tags": ["city", "vlog", "modern", "phone"]},
+    {"provider": "archive", "query": "identifier:instagram-*" + _NEW, "max_items": 10,
+     "tags": ["reels", "modern", "phone"]},
     {"provider": "archive", "query": _MT + 'title:("dash cam" OR dashcam)' + _NEW, "max_items": 6,
      "tags": ["dashcam", "traffic", "modern"]},
     {"provider": "archive", "query": _MT + 'title:(dashcam OR "dash cam") AND title:(russia OR russian OR winter OR snow OR compilation)' + _NEW,
@@ -217,9 +219,22 @@ RETIRED_QUERIES = [
     # caught-on-camera tweets: an animal kicked in the street, a man beaten to death, deaths, a plane crash,
     # riots, partisan posts; the mirrortube dashcam queries cover the dashcams
     "identifier:twitter-* AND title:(dashcam OR cctv OR \"caught on\" OR doorbell)" + _NEW,
-    # the Instagram mirror's newest uploads, unfiltered: every title is just "Video by <account>", so no word
-    # filter can screen them, and they brought a man unconscious on a cell floor, police and political accounts
-    "identifier:instagram-*" + _NEW,
+]
+
+# Sources taken out and then put back by the owner of the piece ("I will flag if something feels off"). Their
+# files were deleted with them, so a build fetches each one again by its address until it is in the pool.
+REINSTATED = [
+    {"provider": "archive", "url": "https://archive.org/details/" + ident, "max_items": 1, "tags": tags}
+    for ident, tags in (
+        ("Instagram-DdeICa9AIqS", ["reels", "modern", "phone"]),
+        ("youtube-FtWXWKUK6rg", ["dashcam", "traffic", "modern"]),
+        ("youtube-hCU65_u4poM", ["liminal", "city", "modern"]),
+        ("TikTok-7147085836130094382", ["nature", "animals", "modern", "phone"]),
+        ("youtube-IWbXnhcdIfU", ["animals", "quiet", "modern", "nature"]),
+        ("youtube-Zg-4zw7EcTY", ["home", "faces", "modern"]),
+        ("youtube-__yfsYoKoNE", ["dashcam", "traffic", "modern"]),
+        ("youtube-4YtwK9dGWrY", ["dashcam", "traffic", "modern"]),
+    )
 ]
 
 BEAUTY_JOBS = [j for j in CONTEMPORARY_JOBS if "beauty" in j["tags"]]

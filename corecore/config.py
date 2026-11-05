@@ -77,10 +77,6 @@ _DEFAULT_BLOCKLIST = [
     "violence", "violent", "brutal", "beaten", "beating", "beat up", "beats up", "beat him", "stomp", "stomps",
     "stomped", "stomping", "punch", "punched", "punches", "punching", "slap", "slapped", "slaps", "rioters",
     "died suddenly", "republican", "republicans", "democrat", "democrats", "j6",
-    # what looking through the published clips found that the words above missed: road rage, police
-    # arrests and pursuits, 9/11, an anthill cast, and war in other languages
-    "road rage", "police pursuit", "pursuit", "suspect", "suspects", "pentagon", "anthill", "projectile",
-    "shelling", "proyectil", "misil", "guerra", "bombardeo", "krieg", "война", "обстрел",
 ]
 _env_block = os.environ.get("CORECORE_BLOCKLIST", "")
 BLOCKLIST: list[str] = [] if _env_block.strip().lower() == "off" else (
@@ -113,7 +109,7 @@ _DEFAULT_BLOCKED_UPLOADERS = [
     # "died suddenly" deaths, campaign and partisan posts, true crime, tabloids
     "ray garcia", "diedsuddenly", "the lincoln project", "theblaze", "newsmax", "heartland signal", "andy ngô",
     "andy ngo", "disclose tv", "t greg doucette", "the sun", "investigation discovery", "the intercept",
-    "law crime network", "jackson hinkle official", "jackson hinkle", "mumeixxx",
+    "mumeixxx",
 ]
 
 
@@ -130,16 +126,7 @@ BLOCKED_UPLOADERS: set[str] = set() if _env_up.strip().lower() == "off" else (
 # deletes the files, and the archive search never offers them again.
 BANNED_SOURCES: set[str] = {
     "archive:twitter-1295991588083163136",   # a raccoon kicked in the street at night
-    # found by looking through every published clip, after the text filters had run:
-    "archive:Instagram-DdeICa9AIqS",         # a man unconscious on a cell floor
-    "archive:youtube-FtWXWKUK6rg",           # a missile striking beside a road in Ukraine
-    "archive:youtube-hCU65_u4poM",           # a war-commentary stream on air strikes
-    "archive:TikTok-7147085836130094382",    # a live ant colony killed with molten aluminium for a cast
-    "archive:TikTok-7130942596586818818",    # a sexualised "schoolgirl" clip
-    "archive:youtube-IWbXnhcdIfU",           # a nude performer
-    "archive:youtube-Zg-4zw7EcTY",           # a 9/11 conspiracy video
-    "archive:youtube-__yfsYoKoNE",           # an arrest at gunpoint, a pile-on
-    "archive:youtube-4YtwK9dGWrY",           # police crashes, one fatal
+    "archive:TikTok-7130942596586818818",    # a clip that frames its subject as a schoolchild, sexually
 }
 
 

@@ -90,7 +90,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd in ("export", "build-site"):
         from .export import export_site
         if args.cmd == "build-site" and not args.skip_ingest:
-            from .jobs import run_starter_jobs
+            from .jobs import run_reinstated, run_starter_jobs
+            print(f"put back: {run_reinstated(echo=lambda m: print(f'  {m}'))}")
             budget = args.time_budget
             with db.connect() as conn:
                 have = db.stats(conn)["clips"]

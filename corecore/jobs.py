@@ -155,6 +155,29 @@ def run_starter_jobs(time_budget: float, echo: Callable[[str], None] | None = No
     return summary
 
 
+def run_reinstated(echo: Callable[[str], None] | None = None) -> dict:
+    """Fetch again, by address, every source the owner put back (seeds.REINSTATED) that is not in the pool."""
+    from . import seeds
+
+    summary = {"fetched": 0, "clips": 0}
+    for j in seeds.REINSTATED:
+        ident = j["url"].rstrip("/").rsplit("/", 1)[-1]
+        with db.connect() as conn:
+            row = conn.execute("SELECT status FROM sources WHERE provider = ? AND external_id = ?",
+                               (j["provider"], ident)).fetchone()
+        if row and row["status"] == "done":
+            continue
+        job_id = create_job(j["provider"], None, j["url"], j.get("max_items", 1), j.get("tags"))
+        if echo:
+            echo(f"job {job_id}: putting back {j['url']}")
+        run_job(job_id, echo=echo)
+        with db.connect() as conn:
+            r = conn.execute("SELECT clips_added FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        summary["fetched"] += 1
+        summary["clips"] += int(r["clips_added"] or 0)
+    return summary
+
+
 def claim_next() -> int | None:
     with db.connect() as conn:
         conn.execute("BEGIN IMMEDIATE")
