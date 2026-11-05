@@ -33,17 +33,6 @@ function waitEvent(el, ev, timeout) {
   });
 }
 
-// A little of what follows the current frame, so a clip's first moments do not wait on the network. Never
-// fails: past the timeout the clip goes ahead with what it has.
-function waitData(el, timeout) {
-  return new Promise((resolve) => {
-    if (el.readyState >= 3) return resolve();
-    const done = () => { clearTimeout(timer); el.removeEventListener('canplay', done); resolve(); };
-    const timer = setTimeout(done, timeout);
-    el.addEventListener('canplay', done, { once: true });
-  });
-}
-
 function waitSeek(el, timeout) {
   return new Promise((resolve, reject) => {
     let done = false;
@@ -283,6 +272,31 @@ export class Player {
     }
   }
 
+  // A frame callback runs on each element for as long as it holds a clip. In Safari this is what lets the canvas
+  // draw a video without waiting. A video the page cannot see decodes no pictures until something asks for one,
+  // and when a canvas draw is the first to ask, it holds the whole page, up to a second, until a picture comes:
+  // the freeze at each cut, and then (when the next clip was drawn early to get it over with) just before it. A
+  // frame callback asks without waiting, so pictures are decoding long before the cut, and while it runs the
+  // canvas draws the pictures it brings without asking at all. Elsewhere it costs next to nothing.
+  watchFrames(slot) {
+    const el = slot.el;
+    if (typeof el.requestVideoFrameCallback !== 'function') return;
+    this.unwatchFrames(slot);
+    const token = slot.frameToken;
+    const again = () => {
+      if (slot.frameToken !== token) return;
+      slot.frameReq = el.requestVideoFrameCallback(again);
+    };
+    slot.frameReq = el.requestVideoFrameCallback(again);
+  }
+
+  unwatchFrames(slot) {
+    slot.frameToken = (slot.frameToken || 0) + 1;
+    if (slot.frameReq == null) return;
+    try { slot.el.cancelVideoFrameCallback(slot.frameReq); } catch (e) { /* gone with its source */ }
+    slot.frameReq = null;
+  }
+
   acquire(clipId) {
     const slot = this.pool.find((s) => !s.busy && s.clipId === clipId) || this.pool.find((s) => !s.busy);
     if (slot) slot.busy = true;
@@ -294,6 +308,7 @@ export class Player {
   release(slot, { wash = false } = {}) {
     if (!slot) return;
     slot.token = (slot.token || 0) + 1;
+    this.unwatchFrames(slot);   // no longer drawn, whatever it plays on for
     // one other slot must stay free, so holding this one for a moment never starves the clips being prepared
     const hold = wash && this.pool.some((s) => !s.busy) ? this.audio.throwClip(slot.el) : 0;
     if (hold > 0) {
@@ -404,6 +419,7 @@ export class Player {
         await waitEvent(el, 'loadedmetadata', 8000);
         if (abandoned()) { this.release(slot); cue.preparing = false; return; }
       }
+      this.watchFrames(slot);
       const rate = Math.max(0.1, Math.min(4, cue.ramp ? cue.ramp.from : cue.speed));
       el.defaultPlaybackRate = cue.speed;
       el.playbackRate = rate;
@@ -413,7 +429,6 @@ export class Player {
       cue.creep = cue.offset < this.preroll * rate ? CREEP : 0;
       el.currentTime = Math.max(0, cue.offset - this.preroll * (cue.creep || rate));
       await waitSeek(el, 8000);
-      await waitData(el, 1500);
       if (abandoned()) { this.release(slot); cue.preparing = false; return; }
       cue.slot = slot;
       cue.ready = true;
@@ -630,10 +645,7 @@ export class Player {
     this.rolled = n;
   }
 
-  // Watch the clip rolled last until it moves. Then time its start, so the pre-roll follows this device,
-  // and if it is still off screen draw it once, a pixel big, where this frame's paint covers it: Safari starts
-  // handing a video's frames to a canvas only when first asked, and the first ask waits for a frame, which is
-  // better spent now, unseen, than at the cut.
+  // Watch the clip rolled last until it moves, and time its start, so the pre-roll follows this device.
   watchRoll() {
     const n = this.rolled;
     if (!n || n.startedIn != null) return;
@@ -650,15 +662,6 @@ export class Player {
       this.preroll = Math.min(PREROLL_MAX, Math.max(this.prerollMin, this.startLag + 0.25));
     }
     this.rolled = null;
-    if (this.queue[0] !== n || el.readyState < 2) return;
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.filter = 'none';
-    try { ctx.drawImage(el, 0, 0, 1, 1); } catch (e) { /* not drawable yet: no matter */ }
-    ctx.restore();
   }
 
   render(now) {

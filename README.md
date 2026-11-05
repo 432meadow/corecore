@@ -159,6 +159,9 @@ muted and unseen, half a second before its cut on a phone (a fifth of a second o
 already moving when it appears, and its sound comes up at the cut. The lead grows to what the device is
 seen to need, up to a second and a half, where clips are slow to start. A clip cued at the head of its
 file, such as a voice, plays its lead at a tenth of its speed instead, so the first words are kept.
+In Safari a canvas's first draw of a new clip holds the whole page until that clip's first picture is
+decoded, up to a second; so every video holding a clip keeps a frame callback running, which has its
+pictures decoding long before its cut and lets the canvas draw them without waiting.
 
 **On a phone.** The picture opens in the vertical frame (9:16), with frame and haze at 0.40, and follows the phone as it turns, until a
 frame is chosen by hand. A tap on the picture opens and closes the controls, which rise as a sheet over the
