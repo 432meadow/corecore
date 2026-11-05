@@ -399,10 +399,62 @@ export class Player {
     cue.preparing = false;
   }
 
+  // From one stream to another (a new seed): the picture fades out to the page and the sound with it,
+  // a second of silence on the empty page, then the new stream fades in. `swap` runs under the silence,
+  // before the restart (reseed, new desk); `fastForward` may be a function, read at that moment.
+  async transition({ fastForward = 0, swap = null, fadeOut = 0.5, hold = 1.0, fadeIn = 0.6 } = {}) {
+    const ff = () => (typeof fastForward === 'function' ? fastForward() : fastForward);
+    if (!this.running || this.paused) {   // nothing playing to fade: change at once
+      if (swap) swap();
+      return this.restart(ff());
+    }
+    const now = this.audio.now();
+    if (this.veil?.dir === 'out') {   // still fading out: the latest switch is the one that happens
+      this.pendingSwap = { ff, swap, hold, fadeIn };
+      return;
+    }
+    if (this.veil?.dir === 'hold') {   // already on the silent page: change now, and the second starts over
+      this.holdUntil = now + hold;
+      this.fadeInNext = fadeIn;
+      if (swap) swap();
+      return this.restart(ff());
+    }
+    // fading out from wherever the picture is (fully up, or half way back in from a switch just made)
+    const from = this.veilAlpha(now);
+    this.pendingSwap = { ff, swap, hold, fadeIn };
+    this.veil = { dir: 'out', from: now - from * fadeOut, to: now + (1 - from) * fadeOut };
+    this.audio.silence((1 - from) * fadeOut + 0.01);
+    await new Promise((r) => setTimeout(r, (1 - from) * fadeOut * 1000));
+    const p = this.pendingSwap;
+    this.pendingSwap = null;
+    this.veil = { dir: 'hold' };
+    this.holdUntil = this.audio.now() + p.hold;
+    this.fadeInNext = p.fadeIn;
+    if (p.swap) p.swap();
+    return this.restart(p.ff());
+  }
+
+  veilAlpha(now) {
+    const v = this.veil;
+    if (!v) return 0;
+    if (v.dir === 'hold') return 1;
+    const k = Math.min(1, Math.max(0, (now - v.from) / Math.max(0.01, v.to - v.from)));
+    if (v.dir === 'out') return k;
+    if (k >= 1) { this.veil = null; return 0; }
+    return 1 - k;
+  }
+
   advance() {
     const now = this.audio.now();
     if (this.restarting) {
       if (this.current) this.current.end = now + 0.05;
+      return;
+    }
+    if (this.holdUntil && now < this.holdUntil) {   // the silent page between two streams
+      const old = this.current;
+      if (old && old.kind === 'clip' && old.slot) { this.release(old.slot); old.slot = null; }
+      if (this.previous?.slot) { this.release(this.previous.slot); this.previous.slot = null; this.previous = null; }
+      this.current = { kind: 'black', start: now, end: Math.min(this.holdUntil, now + 0.1), dur: 0.1, audio: { duck: 1 }, fx: {}, phrase: 'wait' };
       return;
     }
     let next = this.queue.shift();
@@ -469,6 +521,11 @@ export class Player {
         this.release(prev.slot, { wash: prev.dur >= 0.6 });   // a burst's 0.2 s cuts stay dry
         prev.slot = null;
       }
+    }
+    if (this.veil?.dir === 'hold') {   // the first shot of the new stream: picture and sound come up together
+      this.holdUntil = 0;
+      this.veil = { dir: 'in', from: now, to: now + this.fadeInNext };
+      this.audio.unsilence(this.fadeInNext);
     }
     this.current = next;
     this.stats.cues++;
@@ -743,6 +800,15 @@ export class Player {
       ctx.restore();
     }
     if (c?.text) this.drawText(c, now);
+    const veil = this.veilAlpha(now);
+    if (veil > 0) {   // between streams: the page closes over everything, captions included
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = veil;
+      ctx.fillStyle = this.fieldNow.bg;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
     if (this.showInfo) this.drawInfo(c);
   }
 

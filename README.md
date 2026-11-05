@@ -147,6 +147,10 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 The URL carries `seed`, `mode`, `tags`, `edge` and `clipfx`, and `aspect` once a frame has been chosen, so
 a link reproduces a stream over the same pool; `[ share this stream ]` in the controls copies it.
 
+**Between streams.** A new seed (or the live channel) does not cut: the picture fades out to the page over
+half a second and the sound with it, a full second of silence on the empty page, then the new stream fades
+in, picture and sound together. A second switch made during the fade takes its place.
+
 **On a phone.** The picture opens in the vertical frame (9:16) and follows the phone as it turns, until a
 frame is chosen by hand. A tap on the picture opens and closes the controls, which rise as a sheet over the
 lower part of the screen with the picture still in view above; every word in brackets is a 44 px target,

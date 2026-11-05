@@ -166,15 +166,18 @@ function setSeed(seed, { live = false } = {}) {
   state.seed = seed;
   $('#seed').value = live ? 'live' : seed;
   flip($('#live'), live);
-  sequencer.reseed(seed);
-  catalog.seed = seedToInt(seed);
-  player.snapEnabled = !live;
-  if (state.started) {
-    player.restart(live ? liveElapsed() : 0);
-    applyMusic();
-  }
   syncUrl();
   status(live ? 'everyone sees this edit right now' : 'a new stream', 2400);
+  // the old stream fades out; under the second of silence that follows, the new one is seeded and its desk
+  // started, then it fades in
+  const swap = () => {
+    sequencer.reseed(seed);
+    catalog.seed = seedToInt(seed);
+    player.snapEnabled = !live;
+    if (state.started) applyMusic();
+  };
+  if (!state.started) { swap(); return; }
+  player.transition({ fastForward: live ? liveElapsed : 0, swap });
 }
 
 function goLive() { setSeed(liveSeed(), { live: true }); }

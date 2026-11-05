@@ -266,7 +266,27 @@ export class AudioEngine {
 
   setVolume(v) {
     this.volume = v;
-    if (this.master) this.master.gain.setTargetAtTime(v, this.now(), 0.05);
+    if (this.master && !this.silenced) this.master.gain.setTargetAtTime(v, this.now(), 0.05);
+  }
+
+  // Between two streams: every sound fades out with the picture and stays silent until unsilence(),
+  // when the next stream's first shot comes up. A volume change meanwhile is kept for the return.
+  silence(fadeOut) {
+    if (!this.master) return;
+    const now = this.now(), g = this.master.gain;
+    this.silenced = true;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(0, now + fadeOut);
+  }
+
+  unsilence(fadeIn) {
+    if (!this.master || !this.silenced) return;
+    const now = this.now(), g = this.master.gain;
+    this.silenced = false;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(this.volume, now + fadeIn);
   }
 
   stopMusic() {
