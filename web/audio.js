@@ -216,7 +216,8 @@ export class AudioEngine {
     this.musicBus.connect(this.duckGain);
     this.duckGain.connect(this.analyser);
     this.analyser.connect(this.master);
-    this.clipBus.connect(this.master);
+    this.buildSpeaker();
+    this.setClipVoicing(this.clipVoicing || 'speaker');
     this.master.connect(ctx.destination);
     this.recDest = ctx.createMediaStreamDestination();
     this.master.connect(this.recDest);
@@ -231,6 +232,101 @@ export class AudioEngine {
   }
 
   now() { return this.ctx ? this.ctx.currentTime : performance.now() / 1000; }
+
+  // The footage's own sound arrives through a small speaker across the room: no low end, a rolled-off
+  // top, a plastic cabinet resonance and a boxy dip, a touch of soft clipping, a short bright room
+  // reflection, and a narrowed image. One layer removed from the audience.
+  buildSpeaker() {
+    const ctx = this.ctx;
+    const sp = (this.speaker = {});
+    sp.input = ctx.createGain();
+    sp.hp = ctx.createBiquadFilter();
+    sp.hp.type = 'highpass';
+    sp.hp.Q.value = 0.7;
+    sp.dip = ctx.createBiquadFilter();
+    sp.dip.type = 'peaking';
+    sp.dip.frequency.value = 480;
+    sp.dip.Q.value = 1.2;
+    sp.dip.gain.value = -3;
+    sp.peak = ctx.createBiquadFilter();
+    sp.peak.type = 'peaking';
+    sp.peak.Q.value = 1.4;
+    sp.lp = ctx.createBiquadFilter();
+    sp.lp.type = 'lowpass';
+    sp.lp.Q.value = 0.9;
+    sp.hp2 = ctx.createBiquadFilter();    // the cone itself: whatever the distortion made below here is lost
+    sp.hp2.type = 'highpass';
+    sp.hp2.Q.value = 0.8;
+    sp.drive = ctx.createGain();
+    sp.shaper = ctx.createWaveShaper();
+    sp.shaper.curve = this.softClipCurve(2.5);
+    sp.shaper.oversample = '2x';
+    sp.mono = ctx.createGain();           // small speakers are not wide
+    sp.mono.channelCount = 1;
+    sp.mono.channelCountMode = 'explicit';
+    sp.room = ctx.createConvolver();
+    sp.room.buffer = this.makeRoomIR(0.45);
+    sp.roomMix = ctx.createGain();
+    sp.dry = ctx.createGain();
+    sp.output = ctx.createGain();
+    // highpass -> boxy dip -> drive -> soft clip -> cabinet resonance -> (dry + room) -> lowpass last,
+    // so the distortion's harmonics and the room's brightness are heard through the same small cone
+    sp.input.connect(sp.hp);
+    sp.hp.connect(sp.dip);
+    sp.dip.connect(sp.drive);
+    sp.drive.connect(sp.shaper);
+    sp.shaper.connect(sp.peak);
+    sp.peak.connect(sp.dry);
+    sp.dry.connect(sp.lp);
+    sp.peak.connect(sp.room);
+    sp.room.connect(sp.roomMix);
+    sp.roomMix.connect(sp.lp);
+    sp.lp.connect(sp.hp2);
+    sp.hp2.connect(sp.mono);
+    sp.mono.connect(sp.output);
+    sp.output.connect(this.master);
+  }
+
+  // unity slope at zero (quiet signal passes unchanged), gentle compression toward the rails
+  softClipCurve(k) {
+    const n = 2048, curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(k * x) / k;
+    }
+    return curve;
+  }
+
+  makeRoomIR(seconds) {
+    const rate = this.ctx.sampleRate;
+    const len = Math.floor(rate * seconds);
+    const buf = this.ctx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-8 * i / len);
+    }
+    return buf;
+  }
+
+  // 'direct' (as recorded), 'speaker' (computer speakers across the room), 'phone' (tinnier still)
+  setClipVoicing(mode) {
+    this.clipVoicing = mode;
+    if (!this.ctx) return;
+    const sp = this.speaker;
+    try { this.clipBus.disconnect(); } catch (e) { /* not connected yet */ }
+    if (mode === 'direct') { this.clipBus.connect(this.master); return; }
+    const phone = mode === 'phone';
+    sp.hp.frequency.value = phone ? 420 : 210;
+    sp.hp2.frequency.value = phone ? 460 : 240;
+    sp.lp.frequency.value = phone ? 3800 : 4800;
+    sp.peak.frequency.value = phone ? 3000 : 2400;
+    sp.peak.gain.value = phone ? 7 : 5;
+    sp.dip.gain.value = phone ? -5 : -4;
+    sp.drive.gain.value = phone ? 2.2 : 1.6;
+    sp.dry.gain.value = phone ? 0.75 : 0.85;
+    sp.roomMix.gain.value = phone ? 0.3 : 0.24;
+    this.clipBus.connect(sp.input);
+  }
 
   makeReverb(seconds) {
     const rate = this.ctx.sampleRate;

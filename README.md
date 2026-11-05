@@ -95,6 +95,11 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   emit onsets, so cuts can land on them. Pick it for any mode from the music menu or with `?music=desk`.
 - **Frame and haze**: the picture sits inside the frame, slightly smaller, its edges feathered into the
   dark (a slider in the controls, `?edge=0.6` in the URL; 0 is full bleed).
+- **Clip audio through computer speakers**: when the footage's own sound surfaces (voice phrases, jump
+  cuts) it arrives one layer removed, as if from a small speaker across the room: no low end, a rolled-off
+  top, a cabinet resonance and a boxy dip, a touch of soft clipping, a short bright reflection, a narrowed
+  image. Measured at the output: 31 dB down below 120 Hz, +7 dB at 2-3 kHz, 13 dB off above 8 kHz. The
+  controls offer a tinnier phone-speaker voicing and the direct sound (`?clipfx=phone|direct`).
 - **Modes**: `corecore` (default), `online` (contemporary material with a cinematic treatment: slow
   motion and speed ramps, vlog jump cuts, sound bleeding across cuts, a piano bed), `hopecore` (warmer,
   quotes, no cut to black), `chaos` (the 2023 nichetok turn: layered, random speeds, textures), `dwell`

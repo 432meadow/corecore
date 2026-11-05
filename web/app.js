@@ -24,6 +24,7 @@ const state = {
   music: params.get('music') || 'generated',
   tags: (params.get('tags') || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
   edge: params.has('edge') ? Math.max(0, Math.min(1, Number(params.get('edge')) || 0)) : 0.6,
+  clipfx: ['direct', 'speaker', 'phone'].includes(params.get('clipfx')) ? params.get('clipfx') : 'speaker',
   slowed: params.get('slowed') === '1',
   started: false,
 };
@@ -52,6 +53,7 @@ function syncUrl() {
   if (state.slowed) p.set('slowed', '1');
   if (state.tags.length) p.set('tags', state.tags.join(','));
   if (state.edge !== 0.6) p.set('edge', String(state.edge));
+  if (state.clipfx !== 'speaker') p.set('clipfx', state.clipfx);
   history.replaceState(null, '', `?${p}`);
 }
 
@@ -291,6 +293,9 @@ function wire() {
   $('#slowed').checked = state.slowed;
   $('#edge').value = String(state.edge);
   player.setEdge(state.edge);
+  $('#clipfx').value = state.clipfx;
+  audio.clipVoicing = state.clipfx;
+  $('#clipfx').addEventListener('change', (e) => { state.clipfx = e.target.value; audio.setClipVoicing(state.clipfx); syncUrl(); toast(`clip audio: ${e.target.selectedOptions[0].textContent}`); });
   $('#edge').addEventListener('input', (e) => { state.edge = Number(e.target.value); player.setEdge(state.edge); syncUrl(); });
   player.setAspect(state.aspect);
   syncUrl();
