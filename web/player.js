@@ -267,10 +267,26 @@ export class Player {
     return slot;
   }
 
-  release(slot) {
+  // `wash`: the clip is ending in the edit, so if its sound was audible it is thrown into the reverb and
+  // washes away; the clip plays on, unheard, for the moment the reverb takes, and its slot stays taken.
+  release(slot, { wash = false } = {}) {
     if (!slot) return;
+    slot.token = (slot.token || 0) + 1;
+    // one other slot must stay free, so holding this one for a moment never starves the clips being prepared
+    const hold = wash && this.pool.some((s) => !s.busy) ? this.audio.throwClip(slot.el) : 0;
+    if (hold > 0) {
+      const el = slot.el, token = slot.token;
+      setTimeout(() => {
+        if (slot.token !== token) return;   // released again meanwhile (a restart): already handled
+        try { el.pause(); } catch (e) { /* ignore */ }
+        this.audio.setClipGain(el, 0);
+        slot.busy = false;
+      }, hold * 1000);
+      return;
+    }
     try { slot.el.pause(); } catch (e) { /* ignore */ }
     this.audio.setClipGain(slot.el, 0);
+    this.audio.closeSend(slot.el);
     slot.busy = false;
   }
 
@@ -435,7 +451,7 @@ export class Player {
     this.audio.setScene(next.phrase, next);
     if (next.fx?.flash?.at === 'start') this.flash(next.fx.flash.strength);
     if (prev?.fx?.flash?.at === 'end') this.flash(prev.fx.flash.strength);
-    if (this.previous?.slot) { this.release(this.previous.slot); this.previous.slot = null; this.previous = null; }
+    if (this.previous?.slot) { this.release(this.previous.slot, { wash: true }); this.previous.slot = null; this.previous = null; }
     if (prev && prev.kind === 'clip' && prev.slot) {
       const visual = next.fadeIn > 0 ? next.fadeIn : (next.fx?.double ? next.dur : 0);
       // L-cut: a voice keeps talking under the next shot, fading out over the tail
@@ -445,9 +461,12 @@ export class Player {
         this.previous = prev;
         prev.drawUntil = now + visual;
         prev.releaseAt = now + keep;
-        if (tail > 0) this.audio.fadeClipGain(prev.slot.el, 0, tail);
+        if (tail > 0) {
+          this.audio.washOut(prev.slot.el, tail);
+          this.audio.fadeClipGain(prev.slot.el, 0, tail);
+        }
       } else {
-        this.release(prev.slot);
+        this.release(prev.slot, { wash: prev.dur >= 0.6 });   // a burst's 0.2 s cuts stay dry
         prev.slot = null;
       }
     }
@@ -484,7 +503,7 @@ export class Player {
     const c = this.current;
     if (!c || now >= c.end) this.advance();
     if (this.previous && now >= this.previous.releaseAt) {
-      this.release(this.previous.slot);
+      this.release(this.previous.slot, { wash: true });
       this.previous.slot = null;
       this.previous = null;
     }

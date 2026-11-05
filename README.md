@@ -101,6 +101,11 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   top, a cabinet resonance and a boxy dip, a touch of soft clipping, a short bright reflection, a narrowed
   image. Measured at the output: 31 dB down below 120 Hz, +7 dB at 2-3 kHz, 13 dB off above 8 kHz. The
   controls offer a tinnier phone-speaker voicing and the direct sound (`?clipfx=phone|direct`).
+- **The wash**: when a clip's sound is cut, it washes away instead of stopping. Its last moment is thrown
+  into a long, dark stereo reverb: the dry is muted at the cut, the clip plays on unheard for a fifth of a
+  second to feed the reverb, and the tail blooms about 7 dB under the sound and dies away over some 2.5
+  seconds. A sound bleeding across a cut dissolves into the same reverb as it fades. Cuts shorter than
+  0.6 s (bursts) stay dry, and nothing else in the piece reaches the reverb.
 - **Modes**: `corecore` (default), `online` (contemporary material with a cinematic treatment: slow
   motion and speed ramps, vlog jump cuts, sound bleeding across cuts), `hopecore` (warmer,
   quotes, no cut to black), `chaos` (the 2023 nichetok turn: layered, random speeds, textures), `dwell`

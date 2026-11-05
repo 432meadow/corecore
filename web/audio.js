@@ -3,6 +3,12 @@
 
 import { DeskGenerator } from './desk.js';
 
+// The wash: when a clip's sound is cut, its last moment is thrown into a long, dark reverb, so it washes
+// away instead of stopping. WASH_LEVEL sets how loud the tail blooms against the sound it came from.
+const WASH_LEVEL = 0.8;
+const WASH_FEED = 0.2;        // seconds of the clip, past the cut and unheard dry, that feed the reverb
+const WASH_LCUT = 0.7;        // how far an L-cut's fading sound goes wet before it is gone
+
 
 export class AudioEngine {
   constructor() {
@@ -35,6 +41,7 @@ export class AudioEngine {
     this.duckGain.connect(this.analyser);
     this.analyser.connect(this.master);
     this.buildSpeaker();
+    this.buildWash();
     this.setClipVoicing(this.clipVoicing || 'speaker');
     this.master.connect(ctx.destination);
     this.recDest = ctx.createMediaStreamDestination();
@@ -121,10 +128,56 @@ export class AudioEngine {
     return buf;
   }
 
+  // A stereo hall for the wash: noise decaying to -60 dB over `seconds`, darkening as it goes (air takes
+  // the top first), after a short pre-delay and a soft onset; unit energy per channel.
+  makeWashIR(seconds) {
+    const rate = this.ctx.sampleRate;
+    const len = Math.floor(rate * seconds), pre = Math.floor(rate * 0.01), rise = Math.floor(rate * 0.03);
+    const buf = this.ctx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let y = 0, energy = 0;
+      for (let i = pre; i < len; i++) {
+        const t = (i - pre) / rate;
+        const env = Math.pow(10, -3 * t / seconds) * Math.min(1, (i - pre) / rise);
+        const fc = 7000 * Math.pow(900 / 7000, Math.min(1, t / seconds));
+        y += (1 - Math.exp(-2 * Math.PI * fc / rate)) * ((Math.random() * 2 - 1) - y);
+        d[i] = y * env;
+        energy += d[i] * d[i];
+      }
+      const k = 1 / Math.sqrt(energy || 1);
+      for (let i = pre; i < len; i++) d[i] *= k;
+    }
+    return buf;
+  }
+
+  // The wash is fed only by throws (every clip's send is closed otherwise), so nothing else in the piece is
+  // reverberant. It is voiced like the clip sound going in, then let out wide and dark.
+  buildWash() {
+    const ctx = this.ctx;
+    const w = (this.wash = {});
+    w.input = ctx.createGain();
+    w.hp = ctx.createBiquadFilter(); w.hp.type = 'highpass'; w.hp.Q.value = 0.6;
+    w.lp = ctx.createBiquadFilter(); w.lp.type = 'lowpass'; w.lp.Q.value = 0.6;
+    w.verb = ctx.createConvolver(); w.verb.normalize = false; w.verb.buffer = this.makeWashIR(4.6);
+    w.dark = ctx.createBiquadFilter(); w.dark.type = 'lowpass'; w.dark.frequency.value = 3600; w.dark.Q.value = 0.5;
+    w.out = ctx.createGain(); w.out.gain.value = WASH_LEVEL;
+    w.input.connect(w.hp); w.hp.connect(w.lp); w.lp.connect(w.verb); w.verb.connect(w.dark); w.dark.connect(w.out);
+    w.out.connect(this.master);
+  }
+
+  voiceWash(mode) {
+    const w = this.wash;
+    if (!w) return;
+    w.hp.frequency.value = mode === 'phone' ? 460 : mode === 'direct' ? 70 : 240;
+    w.lp.frequency.value = mode === 'phone' ? 3800 : mode === 'direct' ? 9000 : 4800;
+  }
+
   // 'direct' (as recorded), 'speaker' (computer speakers across the room), 'phone' (tinnier still)
   setClipVoicing(mode) {
     this.clipVoicing = mode;
     if (!this.ctx) return;
+    this.voiceWash(mode);
     const sp = this.speaker;
     try { this.clipBus.disconnect(); } catch (e) { /* not connected yet */ }
     if (mode === 'direct') { this.clipBus.connect(this.master); return; }
@@ -148,12 +201,59 @@ export class AudioEngine {
     g.gain.value = 0;
     src.connect(g);
     g.connect(this.clipBus);
+    const send = this.ctx.createGain();   // pre-fader, into the wash; open only while the clip is thrown
+    send.gain.value = 0;
+    src.connect(send);
+    if (this.wash) send.connect(this.wash.input);
     el._ccSource = src;
     el._ccGain = g;
+    el._ccSend = send;
   }
 
   setClipGain(el, v) {
-    if (el._ccGain) el._ccGain.gain.setTargetAtTime(v, this.now(), 0.04);
+    if (!el._ccGain) return;
+    const now = this.now();
+    el._ccGain.gain.cancelScheduledValues(now);
+    el._ccGain.gain.setTargetAtTime(v, now, 0.04);
+    if (v > 0) this.closeSend(el);   // a clip starting: nothing of it goes to the wash until it is thrown
+  }
+
+  closeSend(el) {
+    if (!el._ccSend) return;
+    const now = this.now();
+    el._ccSend.gain.cancelScheduledValues(now);
+    el._ccSend.gain.setValueAtTime(0, now);
+  }
+
+  // The throw, as a clip is cut: the dry is muted at once, and the send opens to what the audience was
+  // hearing, for WASH_FEED seconds of the sound that follows (the clip plays on, unheard), then closes. The
+  // wash rings on for seconds. Returns how long the clip must keep playing, or 0 if it was not audible.
+  throwClip(el) {
+    if (!el._ccSend || !this.ctx) return 0;
+    const now = this.now(), g = el._ccGain.gain.value;
+    if (g < 0.03) return 0;
+    const s = el._ccSend.gain;
+    s.cancelScheduledValues(now);
+    s.setValueAtTime(0, now);
+    s.linearRampToValueAtTime(g, now + 0.012);
+    s.setValueAtTime(g, now + WASH_FEED);
+    s.linearRampToValueAtTime(0, now + WASH_FEED + 0.09);
+    el._ccGain.gain.cancelScheduledValues(now);
+    el._ccGain.gain.setValueAtTime(g, now);
+    el._ccGain.gain.setTargetAtTime(0, now, 0.025);   // the dry lets go as the wash arrives, with no hole between
+    return WASH_FEED + 0.12;
+  }
+
+  // An L-cut's sound, fading out under the next shot, dissolves into the wash on its way out.
+  washOut(el, seconds) {
+    if (!el._ccSend || !this.ctx) return;
+    const now = this.now(), g = el._ccGain.gain.value;
+    if (g < 0.03) return;
+    const s = el._ccSend.gain;
+    s.cancelScheduledValues(now);
+    s.setValueAtTime(0, now);
+    s.linearRampToValueAtTime(g * WASH_LCUT, now + seconds * 0.5);
+    s.linearRampToValueAtTime(0, now + seconds);
   }
 
   fadeClipGain(el, v, seconds) {
