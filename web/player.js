@@ -10,9 +10,12 @@ const FLASH_SECONDS = 0.14;
 // The page behind the picture. Dark is the screen; light is an off-white sheet, where captions are set in
 // ink with a pale halo and the vignette is gentler, so the picture reads as a print rather than a window.
 const FIELDS = {
-  dark: { bg: '#000', ink: '#fff', inkSoft: '#d8d8d8', halo: 'rgba(0,0,0,0.85)', vignette: 1, light: false },
-  light: { bg: '#fafafa', ink: '#121212', inkSoft: '#2a2a2a', halo: 'rgba(250,250,250,0.9)', vignette: 0.6, light: true },
+  dark: { rgb: [0, 0, 0], bg: 'rgb(0,0,0)', ink: '#fff', inkSoft: '#d8d8d8', halo: 'rgba(0,0,0,0.85)', vignette: 1, light: false },
+  light: { rgb: [250, 250, 250], bg: 'rgb(250,250,250)', ink: '#121212', inkSoft: '#2a2a2a', halo: 'rgba(250,250,250,0.9)', vignette: 0.6, light: true },
 };
+const FIELD_FADE_MS = 700;   // the page changes colour as slowly as the controls around it do
+// Canvas filters (blur, saturate...) are missing in some browsers; setting ctx.filter there does nothing.
+const CAN_FILTER = typeof CanvasRenderingContext2D !== 'undefined' && 'filter' in CanvasRenderingContext2D.prototype;
 
 function waitEvent(el, ev, timeout) {
   return new Promise((resolve, reject) => {
@@ -69,6 +72,9 @@ export class Player {
     this.noise = [];
     this.vignette = null;
     this.field = FIELDS.dark;   // the page behind the picture: black, or off-white like paper
+    this.fieldFrom = null;      // while the page changes colour: where it started
+    this.fieldT0 = 0;
+    this.fieldNow = FIELDS.dark;   // the page as painted this frame
     this.flashUntil = 0;
     this.flashStrength = 0;
     this.showInfo = false;
@@ -86,14 +92,30 @@ export class Player {
 
   setEdge(e) {
     this.edge = Math.max(0, Math.min(1, e));
-    this.frameMaskKey = null;
   }
 
-  // The picture sits inside the frame, smaller, its edges feathered into the dark: an alpha mask
-  // (a blurred rounded rectangle, built once per size) applied to the composited picture before it
-  // is drawn back scaled down.
   // The field: 'dark' is a black screen, 'light' an off-white page the picture sits on like a print.
-  setField(name) { this.field = FIELDS[name] || FIELDS.dark; }
+  // While playing, the page cross-fades to the new colour, in step with the controls.
+  setField(name) {
+    const to = FIELDS[name] || FIELDS.dark;
+    if (to === this.field && !this.fieldFrom) return;
+    const t = performance.now();
+    this.fieldFrom = this.running ? this.fieldAt(t) : null;
+    this.fieldT0 = t;
+    this.field = to;
+    if (!this.running) this.fieldNow = to;
+  }
+
+  fieldAt(t) {
+    const a = this.fieldFrom, b = this.field;
+    if (!a) return b;
+    const k = (t - this.fieldT0) / FIELD_FADE_MS;
+    if (k >= 1) { this.fieldFrom = null; return b; }
+    const e = k <= 0 ? 0 : k * k * (3 - 2 * k);
+    const rgb = a.rgb.map((v, i) => Math.round(v + (b.rgb[i] - v) * e));
+    const near = e < 0.5 ? a : b;
+    return { rgb, bg: `rgb(${rgb.join(',')})`, ink: near.ink, inkSoft: near.inkSoft, halo: near.halo, vignette: a.vignette + (b.vignette - a.vignette) * e, light: b.light };
+  }
 
   // Where the picture sits once framed: the whole canvas at edge 0 or when nothing is playing.
   pictureRect(c) {
@@ -103,41 +125,78 @@ export class Player {
     return { x: (W - pw) / 2, y: (H - ph) / 2, w: pw, h: ph };
   }
 
+  // The picture sits inside the frame, smaller, its edges feathered into the page: an alpha mask applied
+  // to the composited picture before it is drawn back scaled down. The mask is computed, not blurred: its
+  // alpha is exactly 0 on the border (no faint outline where the picture ends), rises with a smootherstep
+  // shoulder to 1 at 1.8 x feather inside, and its corners are round. It is fitted to the clip's own
+  // viewport, so a letterboxed shot fades out at its own edges rather than being cut by the bars.
+  // A few are kept, since cuts move between letterboxed and full shots.
   frameMask(W, H, feather) {
     const key = `${W}x${H}:${feather}`;
-    if (this.frameMaskKey === key) return this.frameMaskCanvas;
+    this.masks ||= new Map();
+    const hit = this.masks.get(key);
+    if (hit) return hit;
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const x = c.getContext('2d');
-    const inset = feather * 0.9, r = feather * 0.6;
-    x.filter = `blur(${(feather * 0.5).toFixed(1)}px)`;
-    x.fillStyle = '#fff';
-    x.beginPath();
-    x.roundRect(inset, inset, W - 2 * inset, H - 2 * inset, r);
-    x.fill();
-    x.filter = 'none';
-    this.frameMaskKey = key;
-    this.frameMaskCanvas = c;
+    const img = x.createImageData(W, H), d = img.data;
+    const span = Math.max(1, feather * 1.8), R = feather * 2.4;   // the fully opaque core has corners of radius 0.6 x feather
+    const n = Math.ceil(span) + 1, lut = new Float32Array(n + 1);
+    for (let i = 0; i <= n; i++) { const t = Math.min(1, i / span); lut[i] = 255 * t * t * t * (t * (6 * t - 15) + 10); }
+    for (let y = 0; y < H; y++) {
+      const dy = Math.min(y + 0.5, H - y - 0.5);
+      let i = y * W * 4;
+      for (let xx = 0; xx < W; xx++, i += 4) {
+        const dx = Math.min(xx + 0.5, W - xx - 0.5);
+        let dist;
+        if (dx < R && dy < R) { const ax = R - dx, ay = R - dy; dist = R - Math.sqrt(ax * ax + ay * ay); } else dist = dx < dy ? dx : dy;
+        let a;
+        if (dist <= 0) a = 0;
+        else if (dist >= span) a = 255;
+        else { const j = Math.floor(dist), fr = dist - j; a = lut[j] + (lut[j + 1] - lut[j]) * fr; }
+        d[i] = d[i + 1] = d[i + 2] = 255;
+        d[i + 3] = a;
+      }
+    }
+    x.putImageData(img, 0, 0);
+    this.masks.set(key, c);
+    if (this.masks.size > 6) this.masks.delete(this.masks.keys().next().value);
     return c;
   }
 
   applyFrame() {
     const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
-    const feather = Math.round(120 * this.edge * Math.min(W, H) / 720);
+    const { vx, vy, vw, vh } = this.viewport(this.current);
+    const feather = Math.round(120 * this.edge * Math.min(vw, vh) / 720);
     const r = this.pictureRect(this.current);
     const pic = this.scratchCanvas('pic', W, H);
     const px = pic.getContext('2d');
     px.globalCompositeOperation = 'source-over';
     px.clearRect(0, 0, W, H);
-    px.drawImage(this.canvas, 0, 0);
+    if (CAN_FILTER) px.drawImage(this.canvas, 0, 0);
+    else {   // no canvas blur in this browser: soften the haze by a trip through a smaller canvas instead
+      const k = 1 / (1 + 1.2 * this.edge), sw = Math.max(2, Math.round(W * k)), sh = Math.max(2, Math.round(H * k));
+      const soft = this.scratchCanvas('soft', sw, sh), sx = soft.getContext('2d');
+      sx.imageSmoothingEnabled = true;
+      sx.imageSmoothingQuality = 'high';
+      sx.clearRect(0, 0, sw, sh);
+      sx.drawImage(this.canvas, 0, 0, sw, sh);
+      px.imageSmoothingEnabled = true;
+      px.imageSmoothingQuality = 'high';
+      px.drawImage(soft, 0, 0, W, H);
+    }
     px.globalCompositeOperation = 'destination-in';
-    px.drawImage(this.frameMask(W, H, feather), 0, 0);
+    px.drawImage(this.frameMask(vw, vh, feather), vx, vy);
     px.globalCompositeOperation = 'source-over';
+    if (vw < W || vh < H) {   // the letterbox bars are page: keep them clear whatever the browser's compositing
+      px.clearRect(0, 0, W, vy); px.clearRect(0, vy + vh, W, H - vy - vh);
+      px.clearRect(0, vy, vx, vh); px.clearRect(vx + vw, vy, W - vx - vw, vh);
+    }
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.filter = 'none';
-    ctx.fillStyle = this.field.bg;
+    ctx.fillStyle = this.fieldNow.bg;
     ctx.fillRect(0, 0, W, H);
     ctx.drawImage(pic, r.x, r.y, r.w, r.h);
     ctx.restore();
@@ -446,20 +505,25 @@ export class Player {
   render(now) {
     const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
     const c = this.current;
+    this.fieldNow = this.fieldAt(performance.now());
     ctx.save();
     ctx.filter = 'none';
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
-    ctx.fillStyle = this.field.bg;   // a cut to black is a cut to the page: off-white when the field is light
+    ctx.fillStyle = this.fieldNow.bg;   // a cut to black is a cut to the page: off-white when the field is light
     ctx.fillRect(0, 0, W, H);
+    let drawn = false;
     if (c && c.kind === 'clip' && c.slot) {
       const p = this.previous;
       const fadeT = c.fadeIn > 0 ? Math.min(1, (now - c.start) / c.fadeIn) : 1;
-      if (p && p.slot && p.kind === 'clip' && now < (p.drawUntil ?? Infinity)) this.drawClip(p, now, 1);
-      this.drawClip(c, now, c.fx.double ? 0.62 : fadeT);
+      if (p && p.slot && p.kind === 'clip' && now < (p.drawUntil ?? Infinity)) drawn = this.drawClip(p, now, 1) || drawn;
+      drawn = this.drawClip(c, now, c.fx.double ? 0.62 : fadeT) || drawn;
     }
     ctx.restore();
-    if (this.edge > 0 && c && c.kind === 'clip') this.applyFrame();
+    if (drawn) {
+      this.drawPicture(now, c);              // grade, vignette, a flash on paper: part of the picture
+      if (this.edge > 0) this.applyFrame();  // ...so the frame feathers and scales them with it
+    }
     this.drawOverlays(now, c);
   }
 
@@ -479,7 +543,7 @@ export class Player {
 
   drawClip(cue, now, alpha) {
     const el = cue.slot.el;
-    if (el.readyState < 2) return;
+    if (el.readyState < 2) return false;
     const ctx = this.ctx;
     const prog = Math.min(1, Math.max(0, (now - cue.start) / cue.dur));
     const e = prog < 0.5 ? 2 * prog * prog : 1 - Math.pow(-2 * prog + 2, 2) / 2;
@@ -516,8 +580,9 @@ export class Player {
     else if (f.desat) filters.push(`saturate(${(1 - f.desat).toFixed(2)})`);
     if (f.contrast && f.contrast !== 1) filters.push(`contrast(${f.contrast})`);
     if (g.filter) filters.push(g.filter);
-    if (this.edge > 0) filters.push(`blur(${(1.6 * this.edge).toFixed(2)}px)`);   // the haze: a slight gaussian blur before the grain
-    const filterStr = 'filter' in ctx ? filters.join(' ') : '';
+    // the haze: a slight gaussian blur before the grain; not on the low-res texture, whose blocks are the point
+    if (this.edge > 0 && !(cue.fx.pixelate > 1)) filters.push(`blur(${(1.6 * this.edge).toFixed(2)}px)`);
+    const filterStr = CAN_FILTER ? filters.join(' ') : '';
     ctx.globalAlpha = alpha;
     if (blurFit) {
       const bg = this.scratchCanvas('bg', 160, 90);
@@ -525,6 +590,7 @@ export class Player {
       bx.filter = 'blur(6px) brightness(0.45)';
       try { bx.drawImage(el, 0, 0, 160, 90); } catch (err) { /* skip */ }
       bx.filter = 'none';
+      if (!CAN_FILTER) { bx.fillStyle = 'rgba(0,0,0,0.55)'; bx.fillRect(0, 0, 160, 90); }   // the darkening, without filters
       if (filterStr) ctx.filter = filterStr;
       ctx.drawImage(bg, vx, vy, vw, vh);
     }
@@ -548,6 +614,7 @@ export class Player {
     ctx.filter = 'none';
     if (cue.fx.aberration > 0 && alpha >= 1) this.aberrate(vx, vy, vw, vh, cue.fx.aberration);
     ctx.restore();
+    return true;
   }
 
   // Chromatic aberration without per-pixel work: the frame split into a red copy and a cyan copy,
@@ -570,11 +637,61 @@ export class Player {
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  // Everything that belongs to the picture, painted before the frame so that it is feathered and scaled
+  // with the picture and never touches the page: the grade (lifted blacks, tint, bloom), the vignette, and
+  // on the light field the flash. All of it stays inside the clip's viewport, so letterbox bars are page.
+  drawPicture(now, c) {
+    const ctx = this.ctx;
+    const g = GRADES[c?.grade] || GRADES.neutral;
+    const vig = c?.fx?.vignette ?? 0.45;
+    const { vx, vy, vw, vh } = this.viewport(c);
+    ctx.save();
+    ctx.filter = 'none';
+    ctx.beginPath();
+    ctx.rect(vx, vy, vw, vh);
+    ctx.clip();
+    if (g.lift > 0) {   // lifted blacks: nothing in the picture is ever quite black
+      ctx.globalCompositeOperation = 'lighten';
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = `rgb(${g.lift},${g.lift},${g.lift})`;
+      ctx.fillRect(vx, vy, vw, vh);
+    }
+    if (g.tint && g.tintAlpha > 0) {
+      ctx.globalCompositeOperation = g.tintBlend || 'soft-light';
+      ctx.globalAlpha = g.tintAlpha;
+      ctx.fillStyle = g.tint;
+      ctx.fillRect(vx, vy, vw, vh);
+    }
+    if (g.bloom > 0) {   // highlights bleed a little, from a tiny blurred copy of the picture
+      const bl = this.scratchCanvas('bloom', 160, 90);
+      const bx = bl.getContext('2d');
+      bx.filter = 'blur(4px) brightness(1.1) contrast(1.3)';
+      bx.drawImage(this.canvas, vx, vy, vw, vh, 0, 0, 160, 90);
+      bx.filter = 'none';
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = g.bloom;
+      ctx.drawImage(bl, vx, vy, vw, vh);
+    }
+    if (vig > 0 && this.vignette) {   // fitted to the viewport, so a letterboxed shot is vignetted as a picture
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = vig * this.fieldNow.vignette;
+      ctx.drawImage(this.vignette, vx, vy, vw, vh);
+    }
+    if (this.fieldNow.light && now < this.flashUntil) {   // on paper, only the picture blows out
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = Math.min(1, this.flashStrength * (this.flashUntil - now) / FLASH_SECONDS);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(vx, vy, vw, vh);
+    }
+    ctx.restore();
+  }
+
+  // After the frame: the grain (over everything; on either page it is invisible), the flash on a dark
+  // screen (the whole screen blows out), captions and the info overlay.
   drawOverlays(now, c) {
     const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
     const g = GRADES[c?.grade] || GRADES.neutral;
     const grain = ((c?.fx?.grain ?? 0.08) + 0.07 * this.edge) * (g.grain ?? 1);
-    const vig = c?.fx?.vignette ?? 0.45;
     if (grain > 0 && this.noise.length) {
       const tile = this.noise[Math.floor(this.fxRng.next() * this.noise.length)];
       const ox = Math.floor(this.fxRng.next() * 256), oy = Math.floor(this.fxRng.next() * 256);
@@ -586,50 +703,11 @@ export class Player {
       ctx.fillRect(0, 0, W + 256, H + 256);
       ctx.restore();
     }
-    if (c?.kind === 'clip') {
-      // the grade lives inside the picture; letterbox bars stay black
-      const { vx, vy, vw, vh } = this.viewport(c);
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(vx, vy, vw, vh);
-      ctx.clip();
-      if (g.lift > 0) {   // lifted blacks: nothing in the picture is ever quite black
-        ctx.globalCompositeOperation = 'lighten';
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = `rgb(${g.lift},${g.lift},${g.lift})`;
-        ctx.fillRect(vx, vy, vw, vh);
-      }
-      if (g.tint && g.tintAlpha > 0) {
-        ctx.globalCompositeOperation = g.tintBlend || 'soft-light';
-        ctx.globalAlpha = g.tintAlpha;
-        ctx.fillStyle = g.tint;
-        ctx.fillRect(vx, vy, vw, vh);
-      }
-      if (g.bloom > 0) {   // highlights bleed a little, from a tiny blurred copy of the picture
-        const bl = this.scratchCanvas('bloom', 160, 90);
-        const bx = bl.getContext('2d');
-        bx.filter = 'blur(4px) brightness(1.1) contrast(1.3)';
-        bx.drawImage(this.canvas, vx, vy, vw, vh, 0, 0, 160, 90);
-        bx.filter = 'none';
-        ctx.globalCompositeOperation = 'screen';
-        ctx.globalAlpha = g.bloom;
-        ctx.drawImage(bl, vx, vy, vw, vh);
-      }
-      ctx.restore();
-    }
-    if (vig > 0 && this.vignette && c?.kind === 'clip') {   // the vignette belongs to the picture, never to the page
-      const r = this.pictureRect(c);
-      ctx.save();
-      ctx.globalAlpha = vig * this.field.vignette;
-      ctx.drawImage(this.vignette, r.x, r.y, r.w, r.h);
-      ctx.restore();
-    }
-    if (now < this.flashUntil) {
-      const r = this.field.light ? this.pictureRect(c) : { x: 0, y: 0, w: W, h: H };   // on paper, only the picture blows out
+    if (!this.fieldNow.light && now < this.flashUntil) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, this.flashStrength * (this.flashUntil - now) / FLASH_SECONDS);
       ctx.fillStyle = '#fff';
-      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.fillRect(0, 0, W, H);
       ctx.restore();
     }
     if (c?.text) this.drawText(c, now);
@@ -647,9 +725,9 @@ export class Player {
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor = this.field.halo;
+    ctx.shadowColor = this.fieldNow.halo;
     ctx.shadowBlur = title ? 0 : 14 * s;
-    ctx.fillStyle = title ? this.field.inkSoft : this.field.ink;
+    ctx.fillStyle = title ? this.fieldNow.inkSoft : this.fieldNow.ink;
     const quote = c.text.style === 'quote';
     ctx.font = quote ? `italic ${Math.round(36 * s)}px Georgia, "Times New Roman", serif`
       : title ? `300 ${Math.round(22 * s)}px Georgia, "Times New Roman", serif`
