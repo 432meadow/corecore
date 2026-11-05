@@ -61,15 +61,11 @@ const SCENE = { dwell: 0.28, voice: 0.2, jumpcut: 0.3, juxtapose: 0.32, build: 0
 // Cancel pending automation at t and anchor the current value explicitly, so the next ramp starts from
 // where the parameter really is (cancelAndHoldAtTime alone inserts nothing once a ramp has finished).
 function hold(param, t, now, floor = 0.0001) {
-  const v = Math.max(floor, param.value);
-  if (param.cancelAndHoldAtTime) {
-    param.cancelAndHoldAtTime(t);
-    param.setValueAtTime(v, Math.max(now, t));
-  } else {
-    param.cancelScheduledValues(now);
-    param.setValueAtTime(v, now);
-    if (t > now) param.setValueAtTime(v, t);
-  }
+  const v = Math.max(floor, param.value);   // the value now, frozen from now through t
+  if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(t);
+  else param.cancelScheduledValues(now);
+  param.setValueAtTime(v, now);
+  if (t > now) param.setValueAtTime(v, t);
 }
 
 export class WashGenerator {
@@ -99,7 +95,8 @@ export class WashGenerator {
     this.lastClimax = null;
     this.lastCold = -9;
     this.timer = null;
-    this.sources = [];         // every oscillator and buffer source, stopped on the audio clock in stop()
+    this.sources = [];         // long-lived oscillators and buffer sources (LFOs, noise, sub)
+    this.live = new Set();     // every voice still sounding, including dying ones; emptied by onended
   }
 
   // ---- graph ----------------------------------------------------------------------------------
@@ -230,7 +227,7 @@ export class WashGenerator {
 
     // breathing: slower than the edit's cycle, about a decibel either way
     this.lfo(this.breath.gain, 0.012, 0.12);
-    this.out.gain.setTargetAtTime(1, now, 4);
+    this.out.gain.setValueAtTime(1, now);   // the first chord's own six-second attack is the fade-in
 
     this.playChord(now + 0.05, { first: true });
     this.nextChordAt = now + this.interval();
@@ -357,7 +354,7 @@ export class WashGenerator {
         this.releaseVoice(v, at, cross, 'cross');         // a big move: one voice fades as another arrives
         kept.push(this.makeVoice(target, i, at, cross, 'cross'));
       } else {
-        kept.push(this.makeVoice(target, i, at, first ? 6 : cross, 'fade'));
+        kept.push(this.makeVoice(target, i, at, first ? 6 : cross, first ? 'first' : 'fade'));
       }
     }
     for (const v of this.voices) if (!kept.includes(v) && !v.dying) this.releaseVoice(v, at, cross, 'fade');
@@ -371,7 +368,7 @@ export class WashGenerator {
     const strEnv = ctx.createGain();
     const choirEnv = ctx.createGain();
     for (const env of [strEnv, choirEnv]) {
-      if (shape === 'cross') {
+      if (shape === 'cross' || shape === 'first') {
         env.gain.setValueAtTime(0, at);
         env.gain.linearRampToValueAtTime(1, at + attack);
       } else {
@@ -424,7 +421,7 @@ export class WashGenerator {
     strEnv.connect(this.stringsHp);
     choirEnv.connect(this.choirIn);
     const voice = { midi, register, strEnv, choirEnv, oscs, vib, startAt: at, dying: false };
-    this.sources.push(vib, ...oscs.map((x) => x.o));
+    this.live.add(voice);
     return voice;
   }
 
@@ -452,10 +449,24 @@ export class WashGenerator {
         else env.gain.exponentialRampToValueAtTime(0.0001, end);
       }
     }
-    const stopAt = Math.max(end, v.startAt) + 0.5;
+    this.endVoice(v, Math.max(end, v.startAt) + 0.5);
+  }
+
+  // stop a voice's sources at a time on the audio clock and tear the whole subgraph down once they end,
+  // so an endless stream does not keep every voice it ever played
+  endVoice(v, stopAt) {
     for (const { o } of v.oscs) { try { o.stop(stopAt); } catch (e) { /* already scheduled */ } }
     try { v.vib.stop(stopAt); } catch (e) { /* ignore */ }
-    v.oscs[0].o.onended = () => { try { v.strEnv.disconnect(); v.choirEnv.disconnect(); } catch (e) { /* ignore */ } };
+    v.oscs[0].o.onended = () => {
+      try {
+        v.strEnv.disconnect();
+        v.choirEnv.disconnect();
+        for (const { o } of v.oscs) o.disconnect();
+        v.vib.disconnect();
+      } catch (e) { /* ignore */ }
+      this.live.delete(v);
+      v.oscs[0].o.onended = null;
+    };
   }
 
   // one high tone, usually the tonic two octaves up (the motif), slightly sharp, slow to arrive, mostly
@@ -499,12 +510,13 @@ export class WashGenerator {
     this.phrase = phrase;
 
     // tension is put in place as the edit starts moving, so the colour chord is there when the build hits
-    if ((phrase === 'jumpcut' || phrase === 'juxtapose' || phrase === 'build') && this.degree === 0 && !this.pull) {
+    if ((phrase === 'jumpcut' || phrase === 'juxtapose' || phrase === 'build') && this.degree === 0
+        && (!this.pull || (this.pull === 'home' && now >= this.holdUntil))) {
       this.pull = 'away';
       this.nextChordAt = Math.min(this.nextChordAt, now + this.rng.range(1, 3));
     }
-    // and nothing moves harmonically under the build and the burst
-    if ((phrase === 'build' || phrase === 'burst') && !this.pull) this.nextChordAt = Math.max(this.nextChordAt, now + 5);
+    // and nothing moves harmonically under the build and the burst (except the tension just scheduled)
+    if ((phrase === 'build' || phrase === 'burst') && this.pull !== 'away') this.nextChordAt = Math.max(this.nextChordAt, now + 5);
     if (phrase === 'build' && prev !== 'build') this.riserUntil = now + 8;
 
     if (phrase === 'climax') {
@@ -606,9 +618,11 @@ export class WashGenerator {
     this.alive = false;
     clearInterval(this.timer);
     const now = this.ctx.currentTime;
-    hold(this.out.gain, now, now);
-    this.out.gain.exponentialRampToValueAtTime(0.0001, now + 1.8);
-    for (const s of this.sources) { try { s.stop(now + 2.2); } catch (e) { /* already stopped */ } }
-    this.noise.onended = () => { try { this.out.disconnect(); } catch (e) { /* ignore */ } };
+    const fade = 3;   // overlaps the next bed's six-second first attack
+    hold(this.out.gain, now, now, 0);
+    this.out.gain.linearRampToValueAtTime(0, now + fade);
+    for (const s of this.sources) { try { s.stop(now + fade + 0.5); } catch (e) { /* already stopped */ } }
+    for (const v of this.live) this.endVoice(v, now + fade + 0.5);
+    this.noise.onended = () => { try { this.out.disconnect(); this.verbReturn.disconnect(); } catch (e) { /* ignore */ } };
   }
 }
