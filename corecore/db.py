@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS sources (
   tags TEXT DEFAULT ',',
   status TEXT DEFAULT 'pending',
   error TEXT,
+  audited INTEGER DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now')),
   UNIQUE(provider, external_id)
 );
@@ -84,6 +85,9 @@ def init() -> None:
         jcols = {r["name"] for r in conn.execute("PRAGMA table_info(jobs)")}
         if "owner" not in jcols:
             conn.execute("ALTER TABLE jobs ADD COLUMN owner TEXT")
+        scols = {r["name"] for r in conn.execute("PRAGMA table_info(sources)")}
+        if "audited" not in scols:  # sources scraped before the hard blocklist checked descriptions
+            conn.execute("ALTER TABLE sources ADD COLUMN audited INTEGER DEFAULT 0")
 
 
 # Tags are stored as ",a,b,c," so that `tags LIKE '%,a,%'` is an exact-token match.

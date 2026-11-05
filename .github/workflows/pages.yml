@@ -70,8 +70,9 @@ jobs:
           export CORECORE_ARCHIVE_PAGE=$(( (10#$(date +%U) % 6) + 1 ))
           echo "archive page $CORECORE_ARCHIVE_PAGE"
           SET="${{ github.event.inputs.seed_set || 'contemporary' }}"
-          # the cached pool may hold both sets; the contemporary site only publishes clips tagged modern
-          TAGS=""; if [ "$SET" = "contemporary" ]; then TAGS="--tags modern"; fi
+          # the cached pool holds archival material too; the site publishes only clips tagged modern,
+          # whichever contemporary set (contemporary, beauty) a run scraped
+          case "$SET" in archival|all) TAGS="" ;; *) TAGS="--tags modern" ;; esac
           # a push deploys code changes from the cached pool in minutes; scraping happens on the weekly
           # schedule and on manual runs (or when the cache turns out to be thin)
           case "${{ github.event_name }}" in

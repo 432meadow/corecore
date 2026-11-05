@@ -47,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
                    help="if the pool holds fewer clips than this, scrape for --fallback-budget seconds even when --time-budget is 0")
     p.add_argument("--fallback-budget", type=float, default=1200, dest="fallback_budget")
 
+    p = sub.add_parser("audit", help="remove from the pool every source that names Hitler, the Nazis or the world wars")
+    p.add_argument("--workers", type=int, default=8)
     sub.add_parser("tag-faces", help="(re)run face detection over the pool; needs opencv-python-headless")
     sub.add_parser("worker", help="run only the ingest worker (drain queued jobs)")
     sub.add_parser("stats", help="print pool statistics")
@@ -100,9 +102,17 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"ingest: {summary}")
             else:
                 print(f"ingest skipped: pool holds {have} clips")
+        if args.cmd == "build-site":
+            from .audit import audit
+            print(f"audit: {audit(log=lambda m: print(f'  {m}'))}")
         result = export_site(args.out, height=args.height, max_bytes=int(args.max_mb * 1024 * 1024), max_clips=args.max_clips,
                              tags=[t for t in args.tags.split(",") if t.strip()] or None)
         print(result)
+        return 0
+
+    if args.cmd == "audit":
+        from .audit import audit
+        print(audit(workers=args.workers))
         return 0
 
     if args.cmd == "tag-faces":

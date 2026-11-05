@@ -78,6 +78,21 @@ _env_block = os.environ.get("CORECORE_BLOCKLIST", "")
 BLOCKLIST: list[str] = [] if _env_block.strip().lower() == "off" else (
     _DEFAULT_BLOCKLIST + [w.strip().lower() for w in _env_block.split(",") if w.strip()])
 
+# Footage of Hitler, the Nazis, fascism and the world wars is not part of this piece in any form. These words
+# are always on (CORECORE_BLOCKLIST=off does not lift them), and they are matched not only in titles and
+# uploader names but in a source's description and subjects on the archive, so a compilation that does not
+# name him in its title is caught too; `python -m corecore audit` removes what an older scrape let in.
+HARD_BLOCKLIST: list[str] = [
+    "hitler", "hitlers", "adolf", "nazi", "nazis", "nazism", "neo-nazi", "neonazi", "third reich", "reich",
+    "reichstag", "swastika", "swastikas", "fuhrer", "führer", "fuehrer", "goebbels", "himmler", "goering", "göring",
+    "heydrich", "eichmann", "mengele", "rommel", "wehrmacht", "luftwaffe", "kriegsmarine", "gestapo", "waffen-ss",
+    "waffen ss", "hitler youth", "hitlerjugend", "nuremberg rally", "nuremberg trials", "triumph of the will",
+    "triumph des willens", "riefenstahl", "wochenschau", "kristallnacht", "holocaust", "shoah", "auschwitz",
+    "concentration camp", "death camp", "mussolini", "fascist", "fascists", "fascism", "ww2", "wwii", "ww ii",
+    "world war 2", "world war ii", "second world war", "ww1", "wwi", "world war 1", "world war i", "first world war",
+    "blitz", "blitzkrieg", "d-day", "propaganda",
+]
+
 # Accounts whose posts are campaigns, lobbying or activism rather than footage of the world; matched against
 # the uploader name, case-insensitively. Extend with CORECORE_BLOCKED_UPLOADERS="name,name"; "off" disables.
 _DEFAULT_BLOCKED_UPLOADERS = ["officialpeta", "israelinusa", "aipac", "btselem", "govchristie", "roosterteeth"]
@@ -87,10 +102,19 @@ BLOCKED_UPLOADERS: set[str] = set() if _env_up.strip().lower() == "off" else (
 
 
 _BLOCK_RE = re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(w) for w in BLOCKLIST) + r")(?![a-z0-9])") if BLOCKLIST else None
+_HARD_RE = re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(w) for w in HARD_BLOCKLIST) + r")(?![a-z0-9])")
+
+
+def hard_blocked(text: str | None) -> bool:
+    """True when any text about a source (title, uploader, description, subjects) names Hitler, the Nazis, fascism
+    or the world wars. Whole words, case-insensitive."""
+    return bool(_HARD_RE.search((text or "").lower()))
 
 
 def blocked_title(title: str | None) -> bool:
     """Whole-word match (so "war" does not catch "warm" or "software"), case-insensitive."""
+    if hard_blocked(title):
+        return True
     if not _BLOCK_RE:
         return False
     return bool(_BLOCK_RE.search((title or "").lower()))

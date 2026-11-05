@@ -43,6 +43,24 @@ def _runtime_seconds(s) -> float | None:
     return secs or None
 
 
+def _text(v) -> str:
+    """A metadata field as plain text: the archive gives strings or lists of strings."""
+    if v is None:
+        return ""
+    if isinstance(v, (list, tuple)):
+        return " ".join(str(x) for x in v)
+    return str(v)
+
+
+def hard_blocked_metadata(md: dict) -> bool:
+    return config.hard_blocked(" ".join(_text(md.get(k)) for k in ("title", "description", "subject", "creator")))
+
+
+def fetch_metadata(ident: str) -> dict:
+    """An item's metadata alone (title, description, subjects...), without its file list."""
+    return _get_json(META_URL + urllib.parse.quote(ident) + "/metadata", timeout=30).get("result", {}) or {}
+
+
 def _first(v):
     return v[0] if isinstance(v, list) and v else v
 
@@ -83,7 +101,7 @@ def choose_file(files: list[dict], prefer_small: bool | None = None) -> dict | N
 
 def _search_page(q: str, sort: str, rows: int, page: int) -> dict:
     params = [("q", q), ("rows", str(rows)), ("page", str(page)), ("output", "json"), ("sort[]", sort)]
-    for fl in ("identifier", "title", "creator", "licenseurl", "runtime"):
+    for fl in ("identifier", "title", "creator", "licenseurl", "runtime", "description", "subject"):
         params.append(("fl[]", fl))
     data = _get_json(SEARCH_URL + "?" + urllib.parse.urlencode(params))
     if "error" in data or "response" not in data:  # advancedsearch answers bad queries with HTTP 200 + {"error": ...}
@@ -132,6 +150,8 @@ class ArchiveProvider(Provider):
             ident = d.get("identifier")
             if not ident or config.blocked_source(str(_first(d.get("title")) or ""), str(_first(d.get("creator")) or "")):
                 continue
+            if config.hard_blocked(_text(d.get("description")) + " " + _text(d.get("subject"))):
+                continue
             cands.append(Candidate("archive", ident, f"https://archive.org/details/{ident}",
                                    title=str(_first(d.get("title")) or ident), uploader=str(_first(d.get("creator")) or ""),
                                    duration=dur, license=str(_first(d.get("licenseurl")) or "")))
@@ -141,6 +161,8 @@ class ArchiveProvider(Provider):
 
     def download(self, cand: Candidate, dest_dir: Path, log: Logger) -> Path:
         meta = _get_json(META_URL + urllib.parse.quote(cand.external_id))
+        if hard_blocked_metadata(meta.get("metadata", {})):
+            raise ProviderError(f"{cand.external_id}: blocked by its title, description or subjects")
         f = choose_file(meta.get("files", []))
         if not f:
             raise ProviderError(f"{cand.external_id}: no video file under {config.MAX_SOURCE_BYTES // 2**20} MB")
