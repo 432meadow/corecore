@@ -68,6 +68,7 @@ export class Player {
     this.snapEnabled = true;
     this.waitingSince = null;
     this.scratch = {};
+    this.edge = 0.6;         // 0 = full bleed; 1 = a small picture with wide hazy edges
     this.origin = null;      // live channel: audio-clock time of stream time zero
     this.streamTime = 0;     // scheduled stream time of the next cue appended to the queue
     this.setAspect('16:9');
@@ -75,6 +76,54 @@ export class Player {
 
   on(ev, fn) { (this.listeners[ev] ||= []).push(fn); }
   emit(ev, data) { for (const fn of this.listeners[ev] || []) fn(data); }
+
+  setEdge(e) {
+    this.edge = Math.max(0, Math.min(1, e));
+    this.frameMaskKey = null;
+  }
+
+  // The picture sits inside the frame, smaller, its edges feathered into the dark: an alpha mask
+  // (a blurred rounded rectangle, built once per size) applied to the composited picture before it
+  // is drawn back scaled down.
+  frameMask(W, H, feather) {
+    const key = `${W}x${H}:${feather}`;
+    if (this.frameMaskKey === key) return this.frameMaskCanvas;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    const inset = feather * 0.9, r = feather * 0.6;
+    x.filter = `blur(${(feather * 0.5).toFixed(1)}px)`;
+    x.fillStyle = '#fff';
+    x.beginPath();
+    x.roundRect(inset, inset, W - 2 * inset, H - 2 * inset, r);
+    x.fill();
+    x.filter = 'none';
+    this.frameMaskKey = key;
+    this.frameMaskCanvas = c;
+    return c;
+  }
+
+  applyFrame() {
+    const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
+    const inset = 0.12 * this.edge, feather = Math.round(120 * this.edge * Math.min(W, H) / 720);
+    const pw = Math.round(W * (1 - inset)), ph = Math.round(H * (1 - inset));
+    const pic = this.scratchCanvas('pic', W, H);
+    const px = pic.getContext('2d');
+    px.globalCompositeOperation = 'source-over';
+    px.clearRect(0, 0, W, H);
+    px.drawImage(this.canvas, 0, 0);
+    px.globalCompositeOperation = 'destination-in';
+    px.drawImage(this.frameMask(W, H, feather), 0, 0);
+    px.globalCompositeOperation = 'source-over';
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.filter = 'none';
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(pic, (W - pw) / 2, (H - ph) / 2, pw, ph);
+    ctx.restore();
+  }
 
   setAspect(a) {
     this.aspect = a;
@@ -392,6 +441,7 @@ export class Player {
       this.drawClip(c, now, c.fx.double ? 0.62 : fadeT);
     }
     ctx.restore();
+    if (this.edge > 0 && c && c.kind === 'clip') this.applyFrame();
     this.drawOverlays(now, c);
   }
 

@@ -36,6 +36,8 @@ export const CONTRAST_PAIRS = [
   ['ads', 'faces'], ['consumerism', 'earth'], ['fear', 'home'], ['childhood', 'screens'],
   ['dashcam', 'vlog'], ['vlog', 'cctv'], ['asmr', 'traffic'], ['games', 'nature'], ['dashcam', 'home'], ['crowd', 'quiet'],
   ['vlog', 'traffic'], ['animals', 'traffic'], ['home', 'cctv'],
+  ['beauty', 'traffic'], ['beauty', 'screens'], ['kind', 'cctv'], ['kind', 'traffic'], ['trailcam', 'city'], ['light', 'dark'],
+  ['trailcam', 'screens'], ['beauty', 'consumerism'], ['kind', 'games'], ['nature', 'dashcam'],
   ['bright', 'dark'], ['still', 'motion'], ['vivid', 'muted'],
 ];
 
@@ -91,6 +93,7 @@ export const MODES = {
     black: { chance: 0.15, dur: [0.4, 0.8], silence: 0, text: 0 },
     fx: { grain: [0.04, 0.09], desat: 0.0, contrast: 1.03, letterbox: 0.08, bw: 0 },
     prefer: { brightness: 0.5, saturation: 0.3 },
+    preferTags: ['beauty', 'kind', 'light', 'trailcam'],
     textStyle: 'quote', textPool: 'quotes', useTitles: false,
     texture: { pixelate: 0, aberration: 0 }, grades: { warm: 4, neutral: 2, bleach: 1 }, stutter: 0.05,
   },
@@ -132,7 +135,7 @@ export const MODES = {
   online: {
     label: 'online (now)',
     blurb: 'contemporary material, cinematic treatment: slow motion, jump cuts, sound bleeding across cuts.',
-    music: { style: 'wash', root: 55, mode: 'dorian', scale: 'minor', chordSeconds: [16, 28], glide: [4, 8], brightness: 0.45, choir: 0.9, air: 0.8, shimmer: 0.8, pluck: 0.5, cutoff: 1200 },
+    music: { style: 'desk', root: 55, mode: 'dorian', scale: 'minor', chordSeconds: [16, 28], glide: [4, 8], brightness: 0.45, choir: 0.9, air: 0.8, shimmer: 0.8, pluck: 0.5, cutoff: 1200 },
     cycle: ['dwell', 'jumpcut', 'juxtapose', 'build', 'burst', 'climax', 'black'],
     dwell: { clips: [1, 2], dur: [3, 6], speed: [0.5, 1.0], zoom: [1.02, 1.1], text: 0.05, fade: 0 },
     voice: { chance: 0.4, dur: [3, 7], duck: 0.3 },
@@ -237,6 +240,7 @@ export class Sequencer {
   pickClip(filter = {}) {
     const f = Object.assign({}, filter);
     f.prefer = Object.assign({}, this.params.prefer, filter.prefer || {});
+    if (this.params.preferTags && !(filter.tags && filter.tags.length)) f.tags = this.params.preferTags;
     f.sourceAvoid = this.lastSource;
     const c = this.catalog.take(f, this.rng);
     if (c) this.lastSource = c.source_id;

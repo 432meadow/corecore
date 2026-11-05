@@ -23,6 +23,7 @@ const state = {
   aspect: ['16:9', '9:16', '1:1', '2.39:1'].includes(params.get('aspect')) ? params.get('aspect') : '16:9',
   music: params.get('music') || 'generated',
   tags: (params.get('tags') || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
+  edge: params.has('edge') ? Math.max(0, Math.min(1, Number(params.get('edge')) || 0)) : 0.6,
   slowed: params.get('slowed') === '1',
   started: false,
 };
@@ -50,6 +51,7 @@ function syncUrl() {
   const p = new URLSearchParams({ seed: state.live ? 'live' : state.seed, mode: state.mode, aspect: state.aspect, music: state.music });
   if (state.slowed) p.set('slowed', '1');
   if (state.tags.length) p.set('tags', state.tags.join(','));
+  if (state.edge !== 0.6) p.set('edge', String(state.edge));
   history.replaceState(null, '', `?${p}`);
 }
 
@@ -68,8 +70,9 @@ function fillModes() {
 
 async function fillMusic() {
   const sel = $('#music');
-  sel.innerHTML = '<option value="generated">generated (mode default: the wash)</option>'
-    + '<option value="wash">generated wash</option><option value="ambient">generated pad (old)</option><option value="piano">generated piano</option>';
+  sel.innerHTML = '<option value="generated">generated (mode default)</option>'
+    + '<option value="desk">computer desk (fan, keys, clicks)</option><option value="wash">ambient wash</option>'
+    + '<option value="ambient">ambient pad (old)</option><option value="piano">piano</option>';
   try {
     let tracks = [];
     if (STATIC) {
@@ -92,7 +95,7 @@ async function fillMusic() {
 
 async function applyMusic() {
   if (!state.started) return;
-  if (['generated', 'wash', 'ambient', 'piano'].includes(state.music)) {
+  if (['generated', 'desk', 'wash', 'ambient', 'piano'].includes(state.music)) {
     const base = MODES[state.mode].music;
     const style = state.music === 'generated' ? (base.style || 'wash') : state.music === 'ambient' ? 'pad' : state.music;
     audio.startGenerated(Object.assign({}, base, { style }), makeRng(`${state.seed}:music`));
@@ -113,7 +116,7 @@ function setMode(name) {
   $('#modeBlurb').textContent = MODES[name].blurb;
   if (state.started) {
     player.flush();
-    if (['generated', 'wash', 'ambient', 'piano'].includes(state.music)) applyMusic();
+    if (['generated', 'desk', 'wash', 'ambient', 'piano'].includes(state.music)) applyMusic();
   }
   syncUrl();
   toast(`mode: ${MODES[name].label}`);
@@ -128,7 +131,7 @@ function setSeed(seed, { live = false } = {}) {
   player.snapEnabled = !live;
   if (state.started) {
     player.restart(live ? liveElapsed() : 0);
-    if (['generated', 'wash', 'ambient', 'piano'].includes(state.music)) applyMusic();
+    if (['generated', 'desk', 'wash', 'ambient', 'piano'].includes(state.music)) applyMusic();
   }
   syncUrl();
   toast(live ? 'live channel: everyone sees this edit right now' : `seed: ${seed}`);
@@ -286,6 +289,9 @@ function wire() {
   });
   $('#aspect').value = state.aspect;
   $('#slowed').checked = state.slowed;
+  $('#edge').value = String(state.edge);
+  player.setEdge(state.edge);
+  $('#edge').addEventListener('input', (e) => { state.edge = Number(e.target.value); player.setEdge(state.edge); syncUrl(); });
   player.setAspect(state.aspect);
   syncUrl();
 

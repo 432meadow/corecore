@@ -102,6 +102,43 @@ CONTEMPORARY_JOBS = [
      "max_items": 4, "tags": ["quiet", "still", "modern"]},
     {"provider": "archive", "query": _MT + 'title:("first day" OR "last day" OR "we moved" OR "moving out" OR goodbye)' + _NEW,
      "max_items": 4, "tags": ["home", "faces", "modern"]},
+    # Beauty: kindness, subtle natural poignance, machines watching nature. The pool leans dark without it.
+    {"provider": "archive", "query": _MT + 'title:("trail cam" OR trailcam OR "trail camera" OR "wildlife camera" OR "camera trap")' + _NEW,
+     "max_items": 8, "tags": ["trailcam", "nature", "animals", "quiet", "beauty", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:(deer OR fox OR owl OR "bird feeder" OR hummingbird OR "backyard birds")' + _NEW,
+     "max_items": 6, "tags": ["nature", "animals", "quiet", "beauty", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:("golden hour" OR sunrise OR sunset OR "morning light" OR "blue hour") AND NOT title:(vlog OR haul)' + _NEW,
+     "max_items": 6, "tags": ["light", "nature", "beauty", "quiet", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:("first snow" OR snowfall OR "fog" OR "rain on the window" OR "rain sounds" OR blossom OR "cherry blossom")' + _NEW,
+     "max_items": 6, "tags": ["weather", "nature", "beauty", "quiet", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:("northern lights" OR aurora OR "milky way" OR "meteor shower" OR bioluminescence OR "starry night")' + _NEW,
+     "max_items": 5, "tags": ["light", "nature", "beauty", "space", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:(waves OR "ocean sounds" OR "beach walk" OR tide OR "river" OR "forest walk" OR "silent walk")' + _NEW,
+     "max_items": 6, "tags": ["nature", "quiet", "beauty", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:("slow tv" OR "slow television" OR "train journey" OR "cab ride" OR "fireplace") AND NOT title:(vlog)' + _NEW,
+     "max_items": 5, "tags": ["quiet", "beauty", "transit", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:("random acts of kindness" OR "act of kindness" OR "faith in humanity" OR "helping a stranger" OR "paid for")' + _NEW,
+     "max_items": 6, "tags": ["kind", "faces", "crowd", "beauty", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:("airport reunion" OR "surprise reunion" OR "reunited" OR "coming home" OR "welcome home") AND NOT title:(military OR soldier)' + _NEW,
+     "max_items": 6, "tags": ["kind", "faces", "home", "beauty", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:("dog greets" OR "dog welcomes" OR "cat greets" OR "reunited with" OR "rescue dog" OR "adopted")' + _NEW,
+     "max_items": 6, "tags": ["kind", "animals", "home", "beauty", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:(grandma OR grandpa OR grandmother OR grandfather OR "with my nan") AND title:(cooking OR dancing OR garden OR recipe OR visits)' + _NEW,
+     "max_items": 6, "tags": ["kind", "home", "faces", "childhood", "beauty", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:("street musician" OR busker OR "street piano" OR "public piano" OR "choir sings")' + _NEW,
+     "max_items": 5, "tags": ["kind", "crowd", "voice", "beauty", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:("garden tour" OR allotment OR beekeeping OR "bee hive" OR "harvest" OR "planting")' + _NEW,
+     "max_items": 5, "tags": ["nature", "home", "work", "beauty", "quiet", "modern"]},
+    {"provider": "archive", "query": _MT + 'title:("kids playing" OR "first steps" OR "learning to ride" OR "playground" OR "snow day")' + _NEW,
+     "max_items": 5, "tags": ["childhood", "home", "kind", "beauty", "modern"]},
+    {"provider": "archive", "query": "identifier:tiktok-* AND title:(trailcam OR \"trail cam\" OR wildlife OR deer OR fox OR owl OR hummingbird)" + _NEW,
+     "max_items": 8, "tags": ["trailcam", "nature", "animals", "beauty", "modern", "phone"]},
+    {"provider": "archive", "query": "identifier:tiktok-* AND title:(sunset OR sunrise OR goldenhour OR \"golden hour\" OR snow OR blossom OR aurora)" + _NEW,
+     "max_items": 8, "tags": ["light", "nature", "beauty", "quiet", "modern", "phone"]},
+    {"provider": "archive", "query": "identifier:tiktok-* AND title:(wholesome OR kindness OR reunited OR \"faith in humanity\" OR grandma OR grandpa)" + _NEW,
+     "max_items": 8, "tags": ["kind", "faces", "home", "beauty", "modern", "phone"]},
+    {"provider": "archive", "query": "identifier:instagram-* AND title:(wholesome OR sunset OR nature OR wildlife OR kindness OR grandma)" + _NEW,
+     "max_items": 6, "tags": ["beauty", "kind", "nature", "modern", "phone"]},
     # More of the mundane and the strange: transit, weather, liminal places, work, animals, rituals, crowds.
     {"provider": "archive", "query": _MT + 'title:(train OR subway OR metro OR tram) AND title:(ride OR pov OR window OR "cab view")' + _NEW,
      "max_items": 5, "tags": ["traffic", "city", "modern", "transit"]},
@@ -148,5 +185,6 @@ CONTEMPORARY_JOBS = [
     {"provider": "dailymotion", "query": "caught on dashcam", "max_items": 3, "tags": ["dashcam", "traffic", "modern"]},
 ]
 
-SEED_SETS = {"contemporary": CONTEMPORARY_JOBS, "archival": ARCHIVAL_JOBS, "all": CONTEMPORARY_JOBS + ARCHIVAL_JOBS}
+BEAUTY_JOBS = [j for j in CONTEMPORARY_JOBS if "beauty" in j["tags"]]
+SEED_SETS = {"contemporary": CONTEMPORARY_JOBS, "beauty": BEAUTY_JOBS, "archival": ARCHIVAL_JOBS, "all": CONTEMPORARY_JOBS + ARCHIVAL_JOBS}
 STARTER_JOBS = CONTEMPORARY_JOBS  # what `seed` and `build-site` use unless --set says otherwise

@@ -318,7 +318,8 @@ class ContemporaryTest(unittest.TestCase):
 
     def test_seed_sets(self):
         from corecore import seeds
-        self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "archival", "all"})
+        self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "beauty", "archival", "all"})
+        self.assertTrue(all("beauty" in j["tags"] for j in seeds.BEAUTY_JOBS) and len(seeds.BEAUTY_JOBS) >= 10)
         self.assertTrue(all(j["provider"] in ("archive", "dailymotion") for j in seeds.CONTEMPORARY_JOBS))
 
 

@@ -87,6 +87,14 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   screen, so it thins out on a dwell, opens through a build, holds through a burst, swells into the climax
   and drops on the cut to black. Each mode has its own palette (mode, root, brightness, motion, dissonance).
   The music menu also offers a generated piano, the older ambient pad, and your own tracks.
+- **The desk** (`web/desk.js`, the default for `online` mode): instead of music, a room with a computer
+  in it. A PC fan with a blade tone that speeds up when the edit gets frantic, typing in words with spaces
+  and the odd backspace, mouse clicks and scroll-wheel ticks, the mouse sliding, a mug set down now and
+  then, a low room tone. Everything is synthesized from noise bursts and sine bodies. The desk is busy
+  through builds and bursts, still at the climax, and nearly silent after the cut to black; clicks and keys
+  emit onsets, so cuts can land on them. Pick it for any mode from the music menu or with `?music=desk`.
+- **Frame and haze**: the picture sits inside the frame, slightly smaller, its edges feathered into the
+  dark (a slider in the controls, `?edge=0.6` in the URL; 0 is full bleed).
 - **Modes**: `corecore` (default), `online` (contemporary material with a cinematic treatment: slow
   motion and speed ramps, vlog jump cuts, sound bleeding across cuts, a piano bed), `hopecore` (warmer,
   quotes, no cut to black), `chaos` (the 2023 nichetok turn: layered, random speeds, textures), `dwell`
@@ -131,6 +139,11 @@ pool. "copy link" in the controls does that for you.
 
 Two starter sets, one switch (`--set contemporary|archival|all`, or the two buttons in the controls):
 
+- **beauty** (also inside the contemporary set, early in the list): kindness and subtle natural
+  poignance. Trail cams and wildlife cameras, golden hour and first snow and blossom, aurora, waves and
+  forest walks, slow television, reunions, animals greeting people, grandparents cooking and dancing,
+  street musicians, gardens and bees, kids playing. Tagged `beauty`, `kind`, `light`, `trailcam`, so the
+  sequencer can cut kindness against traffic and beauty against screens; `hopecore` prefers them.
 - **contemporary** (the default): internet-native material. The Internet Archive's `mirrortube` collection
   holds about two million YouTube videos that people archived, 920k of them from 2022 on, with H.264 files:
   dashcams, vlogs, walking tours, driving POVs, doorbell and CCTV clips, game moments, pets, raw footage,
