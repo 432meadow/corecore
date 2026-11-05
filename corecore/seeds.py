@@ -71,8 +71,6 @@ CONTEMPORARY_JOBS = [
      "max_items": 8, "tags": ["animals", "home", "modern", "phone"]},
     {"provider": "archive", "query": "identifier:tiktok-* AND title:(pov OR \"a day\" OR walk OR city OR night)" + _NEW,
      "max_items": 8, "tags": ["city", "vlog", "modern", "phone"]},
-    {"provider": "archive", "query": "identifier:instagram-*" + _NEW, "max_items": 10,
-     "tags": ["reels", "modern", "phone"]},
     {"provider": "archive", "query": _MT + 'title:("dash cam" OR dashcam)' + _NEW, "max_items": 6,
      "tags": ["dashcam", "traffic", "modern"]},
     {"provider": "archive", "query": _MT + 'title:(dashcam OR "dash cam") AND title:(russia OR russian OR winter OR snow OR compilation)' + _NEW,
@@ -178,6 +176,9 @@ RETIRED_QUERIES = [
     # caught-on-camera tweets: an animal kicked in the street, a man beaten to death, deaths, a plane crash,
     # riots, partisan posts; the mirrortube dashcam queries cover the dashcams
     "identifier:twitter-* AND title:(dashcam OR cctv OR \"caught on\" OR doorbell)" + _NEW,
+    # the Instagram mirror's newest uploads, unfiltered: every title is just "Video by <account>", so no word
+    # filter can screen them, and they brought a man unconscious on a cell floor, police and political accounts
+    "identifier:instagram-*" + _NEW,
 ]
 
 BEAUTY_JOBS = [j for j in CONTEMPORARY_JOBS if "beauty" in j["tags"]]
