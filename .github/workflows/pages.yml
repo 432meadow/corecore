@@ -47,19 +47,22 @@ jobs:
           cache: pip
 
       - name: install ffmpeg
-        # a runner's package mirror can hang for good: each attempt is bounded, and tried again
-        timeout-minutes: 15
+        # the runner's own Ubuntu mirror can crawl (one served 40 KB/s for an afternoon): each attempt is
+        # bounded, and later attempts go to other official Ubuntu mirrors, which carry the same signed packages
+        timeout-minutes: 18
         run: |
-          if ! command -v ffmpeg >/dev/null; then
-            for i in 1 2 3; do
-              sudo timeout 180 apt-get update -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
-                && sudo timeout 300 apt-get install -y -q -o Acquire::Retries=3 -o Acquire::http::Timeout=30 ffmpeg \
-                && break
-              echo "apt attempt $i did not finish; trying again"; sleep 10
+          try_mirror() {
+            if [ -n "$1" ] && [ -f /etc/apt/apt-mirrors.txt ]; then echo "$1" | sudo tee /etc/apt/apt-mirrors.txt > /dev/null; fi
+            sudo timeout 90 apt-get update -q -o Acquire::Retries=2 -o Acquire::http::Timeout=20 \
+              && sudo timeout 240 apt-get install -y -q --no-install-recommends -o Acquire::Retries=2 -o Acquire::http::Timeout=20 ffmpeg
+          }
+          if ! command -v ffmpeg > /dev/null; then
+            for m in "" "http://archive.ubuntu.com/ubuntu/" "http://mirrors.edge.kernel.org/ubuntu/"; do
+              try_mirror "$m" && break
+              echo "apt via ${m:-the runner's mirror} did not finish; trying another mirror"
             done
           fi
           ffmpeg -version | head -1
-
       - name: install python deps
         run: pip install -r requirements.txt "opencv-python-headless<5"
 
