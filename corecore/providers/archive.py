@@ -117,7 +117,7 @@ class ArchiveProvider(Provider):
             if dur and dur > config.MAX_SOURCE_DURATION:
                 continue
             ident = d.get("identifier")
-            if not ident or config.blocked_title(str(_first(d.get("title")) or "")):
+            if not ident or config.blocked_source(str(_first(d.get("title")) or ""), str(_first(d.get("creator")) or "")):
                 continue
             cands.append(Candidate("archive", ident, f"https://archive.org/details/{ident}",
                                    title=str(_first(d.get("title")) or ident), uploader=str(_first(d.get("creator")) or ""),

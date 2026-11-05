@@ -295,7 +295,20 @@ class ContemporaryTest(unittest.TestCase):
         self.assertFalse(config.blocked_title(None))
         self.assertTrue(config.blocked_title("Russia's NEW Anti-Drone Tanks Just Entered Combat"))
         self.assertTrue(config.blocked_title("Moscow concert hall attack - RAW VIDEO [GRAPHIC]"))
-        for ok in ("a warm day in Essex", "software tutorial", "award show vlog", "stripes on my cat", "sex pistols cover"):
+        # off-topic material found by innocent words on the mirror: games, manga dubs, news, politics, products
+        for junk in ("What Neil DeGrasse Tyson Likes About Starry Night Joe Rogan Podcast", "[Manga Dub] I reunited with my childhood friend",
+                     "CBS EVENING NEWS (12/31/1988): The Fog Bowl", "Hillary Clinton and DNC Paid for the Dossier",
+                     "Satisfyer Pro 2 Modern Blossom ASMR Product Review", "SPIDER-MAN: NO WAY HOME | Heroes Reunited Featurette"):
+            self.assertTrue(config.blocked_title(junk), junk)
+        for fine in ("Russian dashcam compilation, winter", "4K Forest Walk in the Rain", "warm light in the kitchen",
+                     "Switching on the trailcams #camera #trailcam #wildlife", "One Act of Kindness, 10 Years Later"):
+            self.assertFalse(config.blocked_title(fine), fine)
+        # the uploader counts too: a channel called "... News", or an account on the blocked list
+        self.assertTrue(config.blocked_source("Cute kitten runs to police", "Breitbart News"))
+        self.assertTrue(config.blocked_source("We grilled a dog outside a BBQ spot", "officialpeta"))
+        self.assertFalse(config.blocked_source("We grilled a dog outside a BBQ spot", "a neighbour"))
+        self.assertFalse(config.blocked_source("Snow on the allotment", None))
+        for ok in ("a warm day in Essex", "software demo at the fair", "award show vlog", "stripes on my cat", "sex pistols cover"):
             self.assertEqual(config.blocked_title(ok), ok.startswith("sex"), ok)   # whole words only
 
     def test_ytdlp_pasted_links_become_candidates(self):

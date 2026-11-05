@@ -443,7 +443,8 @@ function wire() {
     if (id) { say(e.target, 'cancelling', 0); await fetch(`api/jobs/${id}/cancel`, { method: 'POST' }); refreshJobs(); }
   });
   $('#copyLink').addEventListener('click', async (e) => {
-    try { await navigator.clipboard.writeText(location.href); say(e.currentTarget, 'the link is copied'); } catch (err) { say(e.currentTarget, 'share — copy the address bar', 5000); }
+    const btn = e.currentTarget;   // gone from the event once we have awaited
+    try { await navigator.clipboard.writeText(location.href); say(btn, 'the link is copied'); } catch (err) { say(btn, 'share — copy the address bar', 5000); }
   });
 
   player.on('warn', (m) => console.warn(m));

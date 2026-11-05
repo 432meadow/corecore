@@ -218,7 +218,8 @@ Environment variables, all optional:
 | `CORECORE_NO_WORKER` | unset | `1` disables the in-process worker (run `python -m corecore worker` elsewhere) |
 | `CORECORE_ARCHIVE_PREFER_SMALL` | 0 | `1` prefers the 512 kb/s Internet Archive derivative (faster builds) |
 | `CORECORE_ARCHIVE_PAGE` | 1 | which page of Internet Archive results to take (CI rotates it weekly) |
-| `CORECORE_BLOCKLIST` | built-in list | extra comma-separated title words to drop; `off` disables the filter |
+| `CORECORE_BLOCKLIST` | built-in list | extra comma-separated title words to drop; `off` disables the filter. The built-in list covers adult material, violence and war, and off-topic material a title search keeps finding by accident: anime and manga dubs, cartoons, news and politics, punditry, product reviews, trailers |
+| `CORECORE_BLOCKED_UPLOADERS` | a short built-in list | extra comma-separated uploader names to drop (accounts that post campaigns, lobbying or activism rather than footage of the world); `off` disables it. A blocklist word in an uploader name, such as "news", also drops the source |
 | `CORECORE_LOCAL_ROOTS` | `media/inbox` | extra directories the local provider may read over the API (path-separator separated) |
 | `CORECORE_STREAM_SECONDS` | 90 | how much of a live stream the `stream` provider records per job |
 | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` | | Reddit script-app credentials for the `reddit` provider |
