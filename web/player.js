@@ -68,7 +68,7 @@ export class Player {
     this.snapEnabled = true;
     this.waitingSince = null;
     this.scratch = {};
-    this.edge = 0.6;         // 0 = full bleed; 1 = a small picture with wide hazy edges
+    this.edge = 0.75;        // 0 = full bleed; 1 = a small, soft picture with wide hazy edges
     this.origin = null;      // live channel: audio-clock time of stream time zero
     this.streamTime = 0;     // scheduled stream time of the next cue appended to the queue
     this.setAspect('16:9');
@@ -105,7 +105,7 @@ export class Player {
 
   applyFrame() {
     const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
-    const inset = 0.12 * this.edge, feather = Math.round(120 * this.edge * Math.min(W, H) / 720);
+    const inset = 0.18 * this.edge, feather = Math.round(120 * this.edge * Math.min(W, H) / 720);
     const pw = Math.round(W * (1 - inset)), ph = Math.round(H * (1 - inset));
     const pic = this.scratchCanvas('pic', W, H);
     const px = pic.getContext('2d');
@@ -498,6 +498,7 @@ export class Player {
     else if (f.desat) filters.push(`saturate(${(1 - f.desat).toFixed(2)})`);
     if (f.contrast && f.contrast !== 1) filters.push(`contrast(${f.contrast})`);
     if (g.filter) filters.push(g.filter);
+    if (this.edge > 0) filters.push(`blur(${(1.6 * this.edge).toFixed(2)}px)`);   // the haze: a slight gaussian blur before the grain
     const filterStr = 'filter' in ctx ? filters.join(' ') : '';
     ctx.globalAlpha = alpha;
     if (blurFit) {
@@ -554,7 +555,7 @@ export class Player {
   drawOverlays(now, c) {
     const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
     const g = GRADES[c?.grade] || GRADES.neutral;
-    const grain = (c?.fx?.grain ?? 0.08) * (g.grain ?? 1);
+    const grain = ((c?.fx?.grain ?? 0.08) + 0.07 * this.edge) * (g.grain ?? 1);
     const vig = c?.fx?.vignette ?? 0.45;
     if (grain > 0 && this.noise.length) {
       const tile = this.noise[Math.floor(this.fxRng.next() * this.noise.length)];

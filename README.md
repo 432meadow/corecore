@@ -1,6 +1,6 @@
 # corecore
 
-An endless found-footage montage in the corecore aesthetic. A Python backend scrapes video (Internet
+On the page it is called *absolute clarity*. An endless found-footage montage in the corecore aesthetic. A Python backend scrapes video (Internet
 Archive, anything yt-dlp can reach, or your own files), chops it into shots, and the browser edits those
 shots into an infinite stream: slow sad set-up, accelerating cuts, a burst of blisteringly fast ones, a
 held image, a cut to black. Over and over, never the same twice, reproducible by seed.
@@ -93,8 +93,10 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   then, a low room tone. Everything is synthesized from noise bursts and sine bodies. The desk is busy
   through builds and bursts, still at the climax, and nearly silent after the cut to black; clicks and keys
   emit onsets, so cuts can land on them. Pick it for any mode from the music menu or with `?music=desk`.
-- **Frame and haze**: the picture sits inside the frame, slightly smaller, its edges feathered into the
-  dark (a slider in the controls, `?edge=0.6` in the URL; 0 is full bleed).
+- **Frame and haze**: the picture sits inside the frame, smaller than it, its edges feathered into the
+  dark; the footage is softened with a slight gaussian blur and then grained, so it reads as something seen
+  from a little way off. One fader drives all of it (`?edge=0.75` in the URL is the default; 0 is full
+  bleed, sharp and clean).
 - **Clip audio through computer speakers**: when the footage's own sound surfaces (voice phrases, jump
   cuts) it arrives one layer removed, as if from a small speaker across the room: no low end, a rolled-off
   top, a cabinet resonance and a boxy dip, a touch of soft clipping, a short bright reflection, a narrowed
@@ -134,11 +136,18 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 | s | new seed |
 | l | live channel |
 | m | next mode |
-| v | cycle 16:9, 9:16, 2.39:1 |
+| v | cycle 16:9, 9:16, 1:1, 2.39:1 |
 | x | ban the current clip (removed from the pool for good) |
 
-The URL carries `seed`, `mode`, `aspect`, `music` and `slowed`, so a link reproduces a stream over the same
-pool. "copy link" in the controls does that for you.
+The URL carries `seed`, `mode`, `aspect`, `music`, `slowed`, `tags`, `edge` and `clipfx`, so a link
+reproduces a stream over the same pool; `[ share this stream ]` in the controls copies it.
+
+**The look.** The controls wear the elsewhere look: Roboto or Helvetica at 16, 14 and 13 px and one
+weight, everything lowercase, near-black and three grays with a warm and a cool accent, a light theme that
+follows the system (or `[ dark ]` / `[ light ]` in the controls). Every act and switch is a word in square
+brackets, with no box, border, fill or icon; a button says what it did, or what it is waiting on, in its
+own brackets, and a status line under the picture carries mode, seed and state in fields separated by
+middle dots. There are no toasts, spinners or sounds from the interface.
 
 ## Sources
 
