@@ -64,7 +64,7 @@ export const MODES = {
   corecore: {
     label: 'corecore',
     blurb: 'slow, sad, then too fast. hard cuts, grain, cut to black.',
-    music: { style: 'wash', root: 57, mode: 'aeolian', scale: 'minor', chordSeconds: [14, 26], brightness: 0.35, choir: 0.7, air: 0.6, shimmer: 0.6, pluck: 0.3, cutoff: 900 },
+    music: { style: 'wash', root: 57, mode: 'aeolian', scale: 'minor', chordSeconds: [20, 36], glide: [4, 8], brightness: 0.35, choir: 0.7, air: 0.6, shimmer: 0.6, pluck: 0.3, cutoff: 900 },
     cycle: ['dwell', 'jumpcut', 'juxtapose', 'build', 'burst', 'climax', 'black'],
     dwell: { clips: [1, 2], dur: [3, 6], speed: [0.6, 1.0], zoom: [1.03, 1.12], text: 0.06, fade: 0 },
     voice: { chance: 0.3, dur: [4, 8], duck: 0.3 },
@@ -80,7 +80,7 @@ export const MODES = {
   hopecore: {
     label: 'hopecore',
     blurb: 'same editing, warmer: light, quotes, no cut to black.',
-    music: { style: 'wash', root: 60, mode: 'lydian', scale: 'major', chordSeconds: [10, 18], brightness: 0.65, choir: 1, air: 0.5, shimmer: 1, pluck: 0.6, cutoff: 1800 },
+    music: { style: 'wash', root: 60, mode: 'lydian', scale: 'major', chordSeconds: [14, 24], glide: [3, 6], brightness: 0.65, choir: 1, air: 0.5, shimmer: 1, pluck: 0.6, cutoff: 1800 },
     cycle: ['dwell', 'juxtapose', 'build', 'burst', 'climax', 'dwell'],
     dwell: { clips: [1, 3], dur: [3.5, 6.5], speed: [0.7, 1.0], zoom: [1.03, 1.1], text: 0.3, fade: 0.3 },
     voice: { chance: 0.2, dur: [4, 8], duck: 0.4 },
@@ -114,7 +114,7 @@ export const MODES = {
   dwell: {
     label: 'dwell',
     blurb: 'long takes, slow push-ins, nothing happens.',
-    music: { style: 'wash', root: 50, mode: 'aeolian', scale: 'minor', chordSeconds: [22, 40], glide: [4, 8], brightness: 0.22, sub: 1, choir: 0.5, air: 0.7, shimmer: 0.3, pluck: 0.12, cutoff: 600 },
+    music: { style: 'wash', root: 50, mode: 'aeolian', scale: 'minor', chordSeconds: [28, 48], glide: [6, 12], brightness: 0.22, sub: 1, choir: 0.5, air: 0.7, shimmer: 0.3, pluck: 0.12, cutoff: 600 },
     cycle: ['dwell', 'dwell', 'black'],
     dwell: { clips: [1, 2], dur: [5, 10], speed: [0.5, 0.8], zoom: [1.04, 1.14], text: 0, fade: 0.6 },
     voice: { chance: 0.15, dur: [6, 10], duck: 0.35 },
@@ -132,7 +132,7 @@ export const MODES = {
   online: {
     label: 'online (now)',
     blurb: 'contemporary material, cinematic treatment: slow motion, jump cuts, sound bleeding across cuts.',
-    music: { style: 'wash', root: 55, mode: 'dorian', scale: 'minor', chordSeconds: [12, 22], brightness: 0.45, choir: 0.9, air: 0.8, shimmer: 0.8, pluck: 0.5, cutoff: 1200 },
+    music: { style: 'wash', root: 55, mode: 'dorian', scale: 'minor', chordSeconds: [16, 28], glide: [4, 8], brightness: 0.45, choir: 0.9, air: 0.8, shimmer: 0.8, pluck: 0.5, cutoff: 1200 },
     cycle: ['dwell', 'jumpcut', 'juxtapose', 'build', 'burst', 'climax', 'black'],
     dwell: { clips: [1, 2], dur: [3, 6], speed: [0.5, 1.0], zoom: [1.02, 1.1], text: 0.05, fade: 0 },
     voice: { chance: 0.4, dur: [3, 7], duck: 0.3 },
