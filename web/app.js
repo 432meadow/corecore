@@ -16,13 +16,15 @@ const liveSeed = () => `live-${Math.floor(Date.now() / LIVE_WINDOW_MS)}`;
 const liveElapsed = () => (Date.now() % LIVE_WINDOW_MS) / 1000;
 const randomSeed = () => Math.random().toString(36).slice(2, 8);
 
-const EDGE_DEFAULT = 1;   // the fader at its fullest on load: the small, soft picture
 const ASPECTS = ['16:9', '9:16', '1:1', '2.39:1'];
 // A phone: a touch screen whose short side is phone-sized. It gets the vertical frame while held upright,
 // and follows the phone as it turns, until a frame is chosen by hand.
 const PHONE = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 600;
 const UPRIGHT = matchMedia('(orientation: portrait)');
 const defaultAspect = () => (PHONE && UPRIGHT.matches ? '9:16' : '16:9');
+// frame and haze on load: at its fullest on a computer (the small, soft picture); on a phone's small screen
+// the picture keeps more of itself, at 0.40
+const EDGE_DEFAULT = PHONE ? 0.4 : 1;
 const CLIPFX = { speaker: 'through computer speakers', phone: 'through a phone', direct: 'direct' };
 const PROVIDERS = { archive: 'internet archive', ytdlp: 'yt-dlp', dailymotion: 'dailymotion', reddit: 'reddit', stream: 'a stream', local: 'local files' };
 

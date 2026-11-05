@@ -91,8 +91,8 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   piece.
 - **Frame and haze**: the picture sits inside the frame, smaller than it, its edges feathered into the
   page; the footage is softened with a slight gaussian blur and then grained, so it reads as something seen
-  from a little way off. One fader drives all of it, and it loads at its fullest (`?edge=1`; 0 is full
-  bleed, sharp and clean).
+  from a little way off. One fader drives all of it: it loads at its fullest on a computer (`?edge=1`) and
+  at 0.40 on a phone, where the screen is small; 0 is full bleed, sharp and clean.
 - **The page**: by default the picture sits on an off-white page, like a print, with captions set in ink;
   a cut to black is then a cut to the page, the vignette stays inside the picture and a flash blows out the
   picture alone. `[ dark ]` in the controls puts it back on a black screen, `[ as the system has it ]`
@@ -154,7 +154,7 @@ a link reproduces a stream over the same pool; `[ share this stream ]` in the co
 half a second and the sound with it, a full second of silence on the empty page, then the new stream fades
 in, picture and sound together. A second switch made during the fade takes its place.
 
-**On a phone.** The picture opens in the vertical frame (9:16) and follows the phone as it turns, until a
+**On a phone.** The picture opens in the vertical frame (9:16), with frame and haze at 0.40, and follows the phone as it turns, until a
 frame is chosen by hand. A tap on the picture opens and closes the controls, which rise as a sheet over the
 lower part of the screen with the picture still in view above; every word in brackets is a 44 px target,
 and `[ pause ]` stands in for the space bar. On a computer a click on the picture does the same. The viewer itself carries no text: the
