@@ -7,6 +7,12 @@ const POOL_SIZE = 8;
 const AHEAD = 5;
 const QUEUE_MIN = 10;
 const FLASH_SECONDS = 0.14;
+// The page behind the picture. Dark is the screen; light is an off-white sheet, where captions are set in
+// ink with a pale halo and the vignette is gentler, so the picture reads as a print rather than a window.
+const FIELDS = {
+  dark: { bg: '#000', ink: '#fff', inkSoft: '#d8d8d8', halo: 'rgba(0,0,0,0.85)', vignette: 1, light: false },
+  light: { bg: '#fafafa', ink: '#121212', inkSoft: '#2a2a2a', halo: 'rgba(250,250,250,0.9)', vignette: 0.6, light: true },
+};
 
 function waitEvent(el, ev, timeout) {
   return new Promise((resolve, reject) => {
@@ -62,13 +68,14 @@ export class Player {
     this.filling = null;
     this.noise = [];
     this.vignette = null;
+    this.field = FIELDS.dark;   // the page behind the picture: black, or off-white like paper
     this.flashUntil = 0;
     this.flashStrength = 0;
     this.showInfo = false;
     this.snapEnabled = true;
     this.waitingSince = null;
     this.scratch = {};
-    this.edge = 0.75;        // 0 = full bleed; 1 = a small, soft picture with wide hazy edges
+    this.edge = 1;           // 0 = full bleed; 1 = a small, soft picture with wide hazy edges (the default)
     this.origin = null;      // live channel: audio-clock time of stream time zero
     this.streamTime = 0;     // scheduled stream time of the next cue appended to the queue
     this.setAspect('16:9');
@@ -85,6 +92,17 @@ export class Player {
   // The picture sits inside the frame, smaller, its edges feathered into the dark: an alpha mask
   // (a blurred rounded rectangle, built once per size) applied to the composited picture before it
   // is drawn back scaled down.
+  // The field: 'dark' is a black screen, 'light' an off-white page the picture sits on like a print.
+  setField(name) { this.field = FIELDS[name] || FIELDS.dark; }
+
+  // Where the picture sits once framed: the whole canvas at edge 0 or when nothing is playing.
+  pictureRect(c) {
+    const W = this.canvas.width, H = this.canvas.height;
+    if (!(this.edge > 0 && c && c.kind === 'clip')) return { x: 0, y: 0, w: W, h: H };
+    const inset = 0.18 * this.edge, pw = Math.round(W * (1 - inset)), ph = Math.round(H * (1 - inset));
+    return { x: (W - pw) / 2, y: (H - ph) / 2, w: pw, h: ph };
+  }
+
   frameMask(W, H, feather) {
     const key = `${W}x${H}:${feather}`;
     if (this.frameMaskKey === key) return this.frameMaskCanvas;
@@ -105,8 +123,8 @@ export class Player {
 
   applyFrame() {
     const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
-    const inset = 0.18 * this.edge, feather = Math.round(120 * this.edge * Math.min(W, H) / 720);
-    const pw = Math.round(W * (1 - inset)), ph = Math.round(H * (1 - inset));
+    const feather = Math.round(120 * this.edge * Math.min(W, H) / 720);
+    const r = this.pictureRect(this.current);
     const pic = this.scratchCanvas('pic', W, H);
     const px = pic.getContext('2d');
     px.globalCompositeOperation = 'source-over';
@@ -119,9 +137,9 @@ export class Player {
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.filter = 'none';
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = this.field.bg;
     ctx.fillRect(0, 0, W, H);
-    ctx.drawImage(pic, (W - pw) / 2, (H - ph) / 2, pw, ph);
+    ctx.drawImage(pic, r.x, r.y, r.w, r.h);
     ctx.restore();
   }
 
@@ -432,7 +450,7 @@ export class Player {
     ctx.filter = 'none';
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = this.field.bg;   // a cut to black is a cut to the page: off-white when the field is light
     ctx.fillRect(0, 0, W, H);
     if (c && c.kind === 'clip' && c.slot) {
       const p = this.previous;
@@ -599,17 +617,19 @@ export class Player {
       }
       ctx.restore();
     }
-    if (vig > 0 && this.vignette) {
+    if (vig > 0 && this.vignette && c?.kind === 'clip') {   // the vignette belongs to the picture, never to the page
+      const r = this.pictureRect(c);
       ctx.save();
-      ctx.globalAlpha = vig;
-      ctx.drawImage(this.vignette, 0, 0);
+      ctx.globalAlpha = vig * this.field.vignette;
+      ctx.drawImage(this.vignette, r.x, r.y, r.w, r.h);
       ctx.restore();
     }
     if (now < this.flashUntil) {
+      const r = this.field.light ? this.pictureRect(c) : { x: 0, y: 0, w: W, h: H };   // on paper, only the picture blows out
       ctx.save();
       ctx.globalAlpha = Math.min(1, this.flashStrength * (this.flashUntil - now) / FLASH_SECONDS);
       ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(r.x, r.y, r.w, r.h);
       ctx.restore();
     }
     if (c?.text) this.drawText(c, now);
@@ -627,9 +647,9 @@ export class Player {
     ctx.globalAlpha = a;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowColor = this.field.halo;
     ctx.shadowBlur = title ? 0 : 14 * s;
-    ctx.fillStyle = title ? '#d8d8d8' : '#fff';
+    ctx.fillStyle = title ? this.field.inkSoft : this.field.ink;
     const quote = c.text.style === 'quote';
     ctx.font = quote ? `italic ${Math.round(36 * s)}px Georgia, "Times New Roman", serif`
       : title ? `300 ${Math.round(22 * s)}px Georgia, "Times New Roman", serif`

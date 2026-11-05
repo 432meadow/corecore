@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#121212">
   <title>absolute clarity</title>
-  <meta name="description" content="an endless found-footage montage in the corecore aesthetic: contemporary internet video, re-edited forever in your browser.">
+  <meta name="description" content="an endless found-footage montage in the corecore aesthetic: contemporary internet video, re-edited forever in the browser.">
   <meta property="og:title" content="absolute clarity">
   <meta property="og:description" content="an endless found-footage montage. sound on.">
   <meta property="og:type" content="website">
@@ -20,52 +20,50 @@
       <h1>absolute clarity</h1>
       <p class="g">an endless found-footage montage. sound on.</p>
       <button id="start" class="act begin" aria-label="Begin the montage">[ begin ]</button>
-      <p class="hint d">space pause · n next phrase · h controls · i info · f fullscreen · r record · s reseed · l live channel · m mode · v frame · x ban clip</p>
+      <p class="hint g">space pause · n next phrase · h controls · i info · f fullscreen · r record · s reseed · l live channel · m mode · v frame · x ban clip</p>
     </div>
   </div>
 
-  <div id="status" aria-live="polite"></div>
-  <div id="nowPlaying"></div>
-
   <aside id="hud" class="hidden">
     <div class="head">
-      <h1>absolute clarity <span class="g">· the controls</span></h1>
+      <h2>absolute clarity <span class="g">· the controls</span></h2>
       <button id="hideHud" class="act" aria-label="Hide the controls">[ hide ]</button>
     </div>
+    <div id="status" class="status" aria-live="polite"></div>
+    <div id="nowPlaying" class="status"></div>
 
-    <div class="sect">the stream</div>
+    <h3 class="sect">the stream</h3>
     <div class="inline"><div class="seg" id="modes"></div></div>
     <div id="modeBlurb" class="hint g"></div>
     <div class="inline">
-      <label class="field short">seed <input id="seed" size="10" aria-label="The seed of the stream"></label>
+      <label class="field short">seed <input id="seed" size="10"></label>
       <div class="seg">
         <button id="reseed" type="button" class="act" aria-label="Start a new stream from a new seed">[ new seed ]</button>
         <button id="live" type="button" class="switch door" role="switch" aria-checked="false" aria-label="Join the live channel, where everyone sees the same edit at the same moment">[ live channel ]</button>
         <button id="copyLink" type="button" class="act" aria-label="Copy a link to this stream">[ share this stream ]</button>
       </div>
     </div>
-    <label class="field">only clips tagged, comma-separated, empty for everything <input id="poolTags" aria-label="Play only clips carrying these tags"></label>
+    <label class="field">only clips tagged, comma-separated, empty for everything <input id="poolTags"></label>
 
-    <div class="sect">the frame</div>
+    <h3 class="sect">the frame</h3>
     <div class="inline"><div class="seg" id="aspects"></div></div>
     <div class="ctl">
-      <div class="row2"><label for="edge">frame and haze</label><output id="edgeV">0.75</output></div>
-      <input type="range" id="edge" min="0" max="1" step="0.01" value="0.75" aria-label="How small the picture sits in the frame and how soft its edges are">
+      <div class="row2"><label for="edge">frame and haze</label><output id="edgeV">1.00</output></div>
+      <input type="range" id="edge" min="0" max="1" step="0.01" value="1">
     </div>
 
-    <div class="sect">the sound</div>
-    <div class="inline"><div class="seg" id="musics"></div></div>
+    <h3 class="sect">the sound</h3>
+    <div class="hint g">the desk: a fan, keys, the mouse, a mug set down. the footage's own sound comes through now and then,</div>
     <div class="inline"><div class="seg" id="clipfxs"></div></div>
-    <div class="inline"><div class="seg"><button id="slowed" type="button" class="switch" role="switch" aria-checked="false" aria-label="Play uploaded tracks slowed, with reverb">[ slowed + reverb ]</button></div></div>
     <div class="ctl cool">
       <div class="row2"><label for="volume">volume</label><output id="volumeV">0.90</output></div>
-      <input type="range" id="volume" min="0" max="1" step="0.01" value="0.9" aria-label="The volume">
+      <input type="range" id="volume" min="0" max="1" step="0.01" value="0.9">
     </div>
 
-    <div class="sect">words</div>
-    <label class="field">captions to use instead, one per line; empty for the built-in ones<textarea id="customText" rows="3" aria-label="Captions to use instead of the built-in ones"></textarea></label>
+    <h3 class="sect">words</h3>
+    <label class="field">captions to use instead, one per line; empty for the built-in ones<textarea id="customText" rows="3"></textarea></label>
 
-    <div class="sect">acts</div>
+    <h3 class="sect">acts</h3>
     <div class="inline"><div class="seg">
       <button id="next" type="button" class="act" aria-label="Skip to the next phrase">[ next phrase ]</button>
       <button id="ban" type="button" class="act" aria-label="Ban the clip on screen from the pool">[ ban this clip ]</button>
@@ -74,19 +72,19 @@
       <button id="fullscreen" type="button" class="act" aria-label="Fill the screen">[ fullscreen ]</button>
     </div></div>
 
-    <div class="sect">the pool</div>
+    <h3 class="sect">the pool</h3>
     <div id="stats"></div>
-    <div id="tags" class="hint d"></div>
+    <div id="tags" class="hint g"></div>
     <div id="staticNote" class="hint g hidden"></div>
-    <details id="credits" class="hidden"><summary>[ sources and credits ]</summary><ul></ul></details>
+    <details id="credits" class="hidden"><summary title="show the sources and their licences">[ sources and credits ]</summary><ul></ul></details>
     <div id="ingest">
       <div id="empty" class="empty hidden">the pool is empty. queue a set below, or drop videos in media/inbox and run the local provider.</div>
       <form id="jobForm">
         <div class="inline"><div class="seg" id="providers"></div></div>
-        <label class="field">query, url, or a pasted list of links, one per line<textarea id="query" rows="2" aria-label="What to scrape"></textarea></label>
+        <label class="field">query, url, or a pasted list of links, one per line<textarea id="query" rows="2"></textarea></label>
         <div class="inline">
-          <label class="field short">max videos <input id="maxItems" type="number" min="0" max="200" value="5" aria-label="How many videos to take"></label>
-          <label class="field short">tags <input id="jobTags" aria-label="Tags for the clips this job adds"></label>
+          <label class="field short">max videos <input id="maxItems" type="number" min="0" max="200" value="5"></label>
+          <label class="field short">tags <input id="jobTags"></label>
         </div>
         <div class="inline"><div class="seg">
           <button type="submit" class="act" aria-label="Scrape and clip what is written above">[ scrape and clip ]</button>
@@ -98,11 +96,11 @@
       <ul id="jobs"></ul>
     </div>
 
-    <div class="sect">the theme</div>
+    <h3 class="sect">the page</h3>
     <div class="inline"><div class="seg">
-      <button class="switch" id="tDark" type="button" role="switch" aria-checked="false" aria-label="Wear the dark theme">[ dark ]</button>
-      <button class="switch" id="tLight" type="button" role="switch" aria-checked="false" aria-label="Wear the light theme">[ light ]</button>
-      <button class="switch" id="tSys" type="button" role="switch" aria-checked="true" aria-label="Follow the system's theme">[ as the system has it ]</button>
+      <button class="switch" id="tLight" type="button" role="switch" aria-checked="true" aria-label="Set the picture on an off-white page">[ off-white ]</button>
+      <button class="switch" id="tDark" type="button" role="switch" aria-checked="false" aria-label="Set the picture on a dark screen">[ dark ]</button>
+      <button class="switch" id="tSys" type="button" role="switch" aria-checked="false" aria-label="Follow the system's theme">[ as the system has it ]</button>
     </div></div>
 
     <div class="foot">an endless montage · <a href="https://github.com/432meadow/corecore" target="_blank" rel="noopener">[ source ]</a></div>

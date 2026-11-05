@@ -13,7 +13,6 @@ WEB_DIR = ROOT / "web"
 SOURCES_DIR = MEDIA_DIR / "sources"    # downloaded originals (removed after clipping unless KEEP_SOURCES)
 SEGMENTS_DIR = MEDIA_DIR / "segments"  # the clip pool the player streams from
 THUMBS_DIR = MEDIA_DIR / "thumbs"
-MUSIC_DIR = MEDIA_DIR / "music"        # drop your own tracks here (mp3/ogg/wav/m4a/flac)
 INBOX_DIR = MEDIA_DIR / "inbox"        # drop your own footage here and run the `local` provider
 
 # Clipping
@@ -44,7 +43,6 @@ VIDEO_EXTENSIONS = {".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".mpg", ".m
 
 # Directories the `local` provider may read when a job comes in over the API. The CLI adds the path you give it.
 LOCAL_ROOTS: list[Path] = [INBOX_DIR] + [Path(p).expanduser() for p in os.environ.get("CORECORE_LOCAL_ROOTS", "").split(os.pathsep) if p]
-MUSIC_EXTENSIONS = {".mp3", ".ogg", ".oga", ".wav", ".m4a", ".flac", ".aac", ".opus"}
 
 
 # Titles containing any of these are dropped by the search providers (adult material, gore, tabloid
@@ -102,5 +100,5 @@ def blocked_source(title: str | None, uploader: str | None = None) -> bool:
 
 
 def ensure_dirs() -> None:
-    for d in (MEDIA_DIR, SOURCES_DIR, SEGMENTS_DIR, THUMBS_DIR, MUSIC_DIR, INBOX_DIR):
+    for d in (MEDIA_DIR, SOURCES_DIR, SEGMENTS_DIR, THUMBS_DIR, INBOX_DIR):
         d.mkdir(parents=True, exist_ok=True)

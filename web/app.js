@@ -16,9 +16,7 @@ const liveSeed = () => `live-${Math.floor(Date.now() / LIVE_WINDOW_MS)}`;
 const liveElapsed = () => (Date.now() % LIVE_WINDOW_MS) / 1000;
 const randomSeed = () => Math.random().toString(36).slice(2, 8);
 
-const EDGE_DEFAULT = 0.75;
-const GENERATED = ['generated', 'desk', 'wash', 'ambient', 'piano'];
-const MUSIC_LABELS = { generated: 'as the mode has it', desk: 'the desk', wash: 'the wash', ambient: 'the pad', piano: 'piano' };
+const EDGE_DEFAULT = 1;   // the fader at its fullest on load: the small, soft picture
 const ASPECTS = ['16:9', '9:16', '1:1', '2.39:1'];
 const CLIPFX = { speaker: 'through computer speakers', phone: 'through a phone', direct: 'direct' };
 const PROVIDERS = { archive: 'internet archive', ytdlp: 'yt-dlp', dailymotion: 'dailymotion', reddit: 'reddit', stream: 'a stream', local: 'local files' };
@@ -28,11 +26,9 @@ const state = {
   seed: params.get('seed') === 'live' ? liveSeed() : (params.get('seed') || randomSeed()),
   mode: MODES[params.get('mode')] ? params.get('mode') : 'corecore',
   aspect: ASPECTS.includes(params.get('aspect')) ? params.get('aspect') : '16:9',
-  music: params.get('music') || 'generated',
   tags: (params.get('tags') || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
   edge: params.has('edge') ? Math.max(0, Math.min(1, Number(params.get('edge')) || 0)) : EDGE_DEFAULT,
   clipfx: Object.keys(CLIPFX).includes(params.get('clipfx')) ? params.get('clipfx') : 'speaker',
-  slowed: params.get('slowed') === '1',
   provider: 'archive',
   started: false,
 };
@@ -60,6 +56,7 @@ function seg(host, items, current, onPick, what) {
     b.setAttribute('role', 'switch');
     b.setAttribute('aria-checked', String(value === current));
     b.setAttribute('aria-label', `Choose ${label} for ${what}`);
+    b.title = `choose ${label} for ${what}`;
     b.textContent = `[ ${label} ]`;
     b.addEventListener('click', () => onPick(value));
     host.appendChild(b);
@@ -80,57 +77,56 @@ function say(btn, text, ms = 1800) {
   btn.textContent = `[ ${text} ]`;
   if (ms > 0) w.timer = setTimeout(() => { btn.textContent = w.text; }, ms);
 }
-function rename(btn, text) {   // a lasting change of word, e.g. record -> stop recording
+function rename(btn, text, label) {   // a lasting change of word, e.g. record -> stop recording, with its sentence
   const w = words.get(btn) || { text: '', timer: null };
   clearTimeout(w.timer);
   w.text = `[ ${text} ]`;
   words.set(btn, w);
   btn.textContent = w.text;
+  if (label) { btn.setAttribute('aria-label', label); btn.title = label.toLowerCase(); }
 }
 
-// The status line under the picture: mode · seed · what is happening. It shows while the controls
-// are open, and for a moment after a key is pressed; fields are separated by middle dots.
-let note = '', noteTimer = null, statusTimer = null;
+// The status line at the top of the controls: mode · seed · what is happening, fields separated by
+// middle dots. The viewer itself carries no text; a key pressed with the controls hidden is simply obeyed.
+let note = '', noteTimer = null;
 function status(msg, ms = 2400) {
   note = msg;
   clearTimeout(noteTimer);
   if (ms > 0) noteTimer = setTimeout(() => { note = ''; drawStatus(); }, ms);
-  drawStatus(true);
+  drawStatus();
 }
-function drawStatus(wake = false) {
+function drawStatus() {
   const f = [MODES[state.mode].label.toLowerCase().replace(/\s*\(.*?\)/g, ''), state.live ? 'the live channel' : `seed ${state.seed}`];
   if (state.tags.length) f.push(`only ${state.tags.join(', ')}`);
   if (!state.started) f.push('waiting');
   else if (player.paused) f.push('paused');
   if (recorder.active) f.push('recording');
   if (note) f.push(note);
-  const el = $('#status');
-  el.textContent = f.join(' · ');
-  const open = !$('#hud').classList.contains('hidden');
-  if (wake && !open) {
-    el.classList.add('show');
-    clearTimeout(statusTimer);
-    statusTimer = setTimeout(() => { if ($('#hud').classList.contains('hidden')) el.classList.remove('show'); }, 2600);
-  } else el.classList.toggle('show', open);
+  const el = $('#status'), text = f.join(' · ');
+  if (el.textContent !== text) el.textContent = text;   // only a change is announced
 }
 
-function setHud(open) {
-  $('#hud').classList.toggle('hidden', !open);
-  document.body.classList.toggle('hud-open', open);
-  drawStatus();
+function setHud(open) { $('#hud').classList.toggle('hidden', !open); }
+
+// Every button carries its sentence as a title too, lowercased, as the look has it.
+function entitle(root = document) {
+  for (const b of root.querySelectorAll('button[aria-label]')) if (!b.title) b.title = b.getAttribute('aria-label').toLowerCase();
 }
 
-function setTheme(t) {   // 'dark' | 'light' | 'system'
+// The page: 'light' is off-white, the default; 'dark' a black screen; 'system' follows the device.
+// The picture's field follows along, so a cut to black becomes a cut to the page.
+const fieldOf = (t) => (t === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t);
+function setTheme(t) {
   if (t === 'system') delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = t;
   try { localStorage.setItem('corecore.theme', t); } catch (e) { /* private mode */ }
-  for (const [id, v] of [['#tDark', 'dark'], ['#tLight', 'light'], ['#tSys', 'system']]) flip($(id), v === t);
-  // theme-color in the head stays #121212 in both themes, as the look has it
+  for (const [id, v] of [['#tLight', 'light'], ['#tDark', 'dark'], ['#tSys', 'system']]) flip($(id), v === t);
+  player.setField(fieldOf(t));
+  // theme-color in the head stays #121212 whatever the page, as the look has it
 }
 
 function syncUrl() {
-  const p = new URLSearchParams({ seed: state.live ? 'live' : state.seed, mode: state.mode, aspect: state.aspect, music: state.music });
-  if (state.slowed) p.set('slowed', '1');
+  const p = new URLSearchParams({ seed: state.live ? 'live' : state.seed, mode: state.mode, aspect: state.aspect });
   if (state.tags.length) p.set('tags', state.tags.join(','));
   if (state.edge !== EDGE_DEFAULT) p.set('edge', String(state.edge));
   if (state.clipfx !== 'speaker') p.set('clipfx', state.clipfx);
@@ -139,37 +135,10 @@ function syncUrl() {
 
 // ---- the stream -------------------------------------------------------------------------------
 
-async function fillMusic() {
-  const items = Object.entries(MUSIC_LABELS);
-  try {
-    let tracks = [];
-    if (STATIC) {
-      await catalog.load();
-      tracks = (catalog.manifest.music || []).map((t) => ({ name: t.name, url: STATIC.replace(/[^/]*$/, '') + t.url }));
-    } else {
-      const r = await fetch('api/music');
-      tracks = (await r.json()).tracks;
-    }
-    for (const t of tracks) items.push([t.url, String(t.name).toLowerCase()]);
-  } catch (e) { /* no music endpoint */ }
-  if (!items.some(([v]) => v === state.music)) state.music = 'generated';
-  seg($('#musics'), items, state.music, (v) => { state.music = v; light($('#musics'), v); syncUrl(); applyMusic(); }, 'the sound');
-}
-
-async function applyMusic() {
+// The desk, balanced as the mode has it; the only sound there is.
+function applyMusic() {
   if (!state.started) return;
-  if (GENERATED.includes(state.music)) {
-    const base = MODES[state.mode].music;
-    const style = state.music === 'generated' ? (base.style || 'wash') : state.music === 'ambient' ? 'pad' : state.music;
-    audio.startGenerated(Object.assign({}, base, { style }), makeRng(`${state.seed}:music`));
-  } else {
-    try {
-      await audio.playFile(state.music, { slowed: state.slowed });
-    } catch (e) {
-      status('the track would not play, so the mode has its own sound', 4000);
-      audio.startGenerated(MODES[state.mode].music, makeRng(`${state.seed}:music`));
-    }
-  }
+  audio.startGenerated(MODES[state.mode].music, makeRng(`${state.seed}:music`));
 }
 
 function setMode(name) {
@@ -179,7 +148,7 @@ function setMode(name) {
   $('#modeBlurb').textContent = MODES[name].blurb;
   if (state.started) {
     player.flush();
-    if (GENERATED.includes(state.music)) applyMusic();
+    applyMusic();
   }
   syncUrl();
   status('', 0);
@@ -195,7 +164,7 @@ function setSeed(seed, { live = false } = {}) {
   player.snapEnabled = !live;
   if (state.started) {
     player.restart(live ? liveElapsed() : 0);
-    if (GENERATED.includes(state.music)) applyMusic();
+    applyMusic();
   }
   syncUrl();
   status(live ? 'everyone sees this edit right now' : 'a new stream', 2400);
@@ -275,7 +244,7 @@ async function refreshJobs() {
       li.innerHTML = `<span class="st">${job.status}</span> · <b>${escapeHtml(job.provider)}</b> · ${escapeHtml(target)} · `
         + `<span class="pct">${pct}%</span> <span class="msg">${escapeHtml(String(job.message || '').toLowerCase())}</span>`
         + (job.clips_added ? ` · <i>${job.clips_added} clips</i>` : '')
-        + (['queued', 'running'].includes(job.status) ? ` <button type="button" class="act" data-cancel="${job.id}" aria-label="Cancel this job">[ cancel ]</button>` : '');
+        + (['queued', 'running'].includes(job.status) ? ` <button type="button" class="act" data-cancel="${job.id}" aria-label="Cancel this job" title="cancel this job">[ cancel ]</button>` : '');
       list.appendChild(li);
     }
     const active = j.jobs.some((x) => ['queued', 'running'].includes(x.status));
@@ -332,13 +301,13 @@ async function toggleRecord() {
     say(btn, 'saving', 0);
     const blob = await recorder.stop();
     if (blob) recorder.download(blob, `absolute-clarity-${state.mode}-${state.seed}-${Date.now()}.webm`);
-    rename(btn, 'record');
+    rename(btn, 'record', 'Record what you see and hear to a file');
     say(btn, 'saved a webm', 2400);
     status('saved a webm');
   } else {
     recorder.start();
-    rename(btn, 'stop recording');
-    status('recording', 1600);
+    rename(btn, 'stop recording', 'Stop the recording and save it');
+    status('', 0);
   }
 }
 
@@ -376,9 +345,10 @@ async function start() {
 
 function wire() {
   if (STATIC) document.body.classList.add('static');
-  let theme = 'system';
-  try { theme = localStorage.getItem('corecore.theme') || 'system'; } catch (e) { /* ignore */ }
-  setTheme(['dark', 'light', 'system'].includes(theme) ? theme : 'system');
+  let theme = 'light';
+  try { theme = localStorage.getItem('corecore.theme') || 'light'; } catch (e) { /* ignore */ }
+  setTheme(['dark', 'light', 'system'].includes(theme) ? theme : 'light');
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!document.documentElement.dataset.theme) player.setField(fieldOf('system')); });
   $('#tDark').addEventListener('click', () => setTheme('dark'));
   $('#tLight').addEventListener('click', () => setTheme('light'));
   $('#tSys').addEventListener('click', () => setTheme('system'));
@@ -388,11 +358,10 @@ function wire() {
   seg($('#aspects'), ASPECTS.map((a) => [a, a]), state.aspect, setAspect, 'the frame');
   seg($('#clipfxs'), Object.entries(CLIPFX), state.clipfx, setClipFx, 'the clip sound');
   seg($('#providers'), Object.entries(PROVIDERS), state.provider, (v) => { state.provider = v; light($('#providers'), v); }, 'the source');
-  fillMusic();
+  entitle();
 
   $('#seed').value = state.live ? 'live' : state.seed;
   flip($('#live'), state.live);
-  flip($('#slowed'), state.slowed);
   $('#poolTags').value = state.tags.join(', ');
   $('#poolTags').addEventListener('change', async (e) => {
     state.tags = e.target.value.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
@@ -417,7 +386,6 @@ function wire() {
   $('#reseed').addEventListener('click', () => setSeed(randomSeed()));
   $('#live').addEventListener('click', () => (state.live ? setSeed(randomSeed()) : goLive()));
   $('#seed').addEventListener('change', (e) => { const v = e.target.value.trim(); v === 'live' ? goLive() : setSeed(v || 'corecore'); });
-  $('#slowed').addEventListener('click', () => { state.slowed = !state.slowed; flip($('#slowed'), state.slowed); syncUrl(); if (audio.mode === 'file') audio.setSlowed(state.slowed); });
   $('#customText').addEventListener('input', (e) => {
     sequencer.customText = e.target.value.split('\n').map((s) => s.trim()).filter(Boolean);
     try { localStorage.setItem('corecore.text', e.target.value); } catch (err) { /* private mode */ }
@@ -428,6 +396,10 @@ function wire() {
   } catch (err) { /* ignore */ }
   $('#record').addEventListener('click', toggleRecord);
   $('#fullscreen').addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', () => rename($('#fullscreen'), document.fullscreenElement ? 'leave fullscreen' : 'fullscreen', document.fullscreenElement ? 'Leave fullscreen' : 'Fill the screen'));
+  $('#credits').addEventListener('toggle', (e) => { $('#credits summary').textContent = e.target.open ? '[ hide the sources ]' : '[ sources and credits ]'; });
+  // a button clicked with a pointer gives focus back, so space still pauses afterwards
+  document.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b && e.detail > 0) b.blur(); });
   $('#next').addEventListener('click', () => { player.nextPhrase(); say($('#next'), 'next'); });
   $('#ban').addEventListener('click', () => banCurrent($('#ban')));
   $('#info').addEventListener('click', () => setInfo(!player.showInfo));
@@ -456,6 +428,7 @@ function wire() {
   document.addEventListener('keydown', (e) => {
     if (e.target.matches('input, textarea, select')) return;
     const k = e.key.toLowerCase();
+    if ((k === ' ' || k === 'enter') && e.target.matches('button, summary, a')) return;   // the focused control takes it
     if (!state.started && (k === ' ' || k === 'enter')) { start(); return; }
     if (k === ' ') { e.preventDefault(); player.paused ? player.resume() : player.pause(); status('', 1600); }
     else if (k === 'n') { player.nextPhrase(); status('next phrase', 1200); }

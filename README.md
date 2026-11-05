@@ -40,8 +40,8 @@ python -m corecore ingest --provider archive --query "collection:prelinger AND s
 python -m corecore ingest --provider local --url ~/Videos/holiday --tags home,childhood
 ```
 
-Drop music into `media/music/` (mp3, ogg, wav, m4a, flac) and it shows up in the music menu, with an
-optional slowed + reverb treatment. With no music of your own, the built-in generative wash plays (see Music below).
+There is no music: the only sound under the footage is the desk (see below), and the footage's own
+sound, which surfaces now and then as if heard through a small speaker across the room.
 
 ## Two editions
 
@@ -50,7 +50,7 @@ optional slowed + reverb treatment. With no music of your own, the built-in gene
 | runs | `python -m corecore serve` on your machine | any static host; CI builds it |
 | footage | whatever you scrape or drop in, unlimited | a bounded slice of the pool (default 450 MB) exported with `python -m corecore export` |
 | scraping | from the browser or the CLI, any provider | done by the GitHub Actions workflow from the Internet Archive, cached between runs so the pool grows |
-| music | your tracks in `media/music/` + generated bed | generated bed (+ any tracks exported with the site) |
+| sound | the desk, synthesized in the browser | the same |
 | curation | ban clips for everyone | ban clips for yourself (localStorage) |
 
 The static edition is the same player: `index.html` just carries `window.CORECORE_STATIC = "manifest.json"`
@@ -69,7 +69,7 @@ providers (archive | ytdlp | local)
                                                         ▼
 browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js (8 preloaded <video>s, canvas compositor)
                                    ▲                             │
-                             audio.js: music, ducking, onsets, generative bed, recording bus
+                             audio.js: clip sound through a speaker, ducking, onsets, the desk, recording bus
 ```
 
 - **Backend** (`corecore/`): FastAPI app, a SQLite job queue drained by one worker thread, three
@@ -80,30 +80,29 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 - **Player** (`web/player.js`): cuts on the AudioContext clock, cover-fits clips with a slow push-in,
   adds grain, vignette, flashes, letterboxing, shake, double exposure, freeze frames and captions, and
   lets strong music onsets pull a cut forward.
-- **Music** (`web/wash.js`): the default bed is *the wash*, a generative ambient score with almost no notes.
-  Detuned strings through a slow lowpass, a formant choir, a breath of filtered noise, a sub and an occasional
-  shimmer drift through suspended harmony (sus2, add9, m9, m11) by voice leading, under a 7.5 s reverb, and
-  the whole bed breathes on a 25-second cycle. It follows the edit: the player tells it which phrase is on
-  screen, so it thins out on a dwell, opens through a build, holds through a burst, swells into the climax
-  and drops on the cut to black. Each mode has its own palette (mode, root, brightness, motion, dissonance).
-  The music menu also offers a generated piano, the older ambient pad, and your own tracks.
-- **The desk** (`web/desk.js`, the default for `online` mode): instead of music, a room with a computer
-  in it. A PC fan with a blade tone that speeds up when the edit gets frantic, typing in words with spaces
-  and the odd backspace, mouse clicks and scroll-wheel ticks, the mouse sliding, a mug set down now and
-  then, a low room tone. Everything is synthesized from noise bursts and sine bodies. The desk is busy
-  through builds and bursts, still at the climax, and nearly silent after the cut to black; clicks and keys
-  emit onsets, so cuts can land on them. Pick it for any mode from the music menu or with `?music=desk`.
+- **The desk** (`web/desk.js`): the only sound there is. Instead of music, a room with a computer in it:
+  a PC fan with a blade tone that speeds up when the edit gets frantic, typing in words with spaces and
+  the odd backspace, mouse clicks and scroll-wheel ticks, the mouse sliding, a mug set down now and then,
+  a low room tone. Everything is synthesized from noise bursts and sine bodies. The desk is busy through
+  builds and bursts, still at the climax, and nearly silent after the cut to black; clicks and keys emit
+  onsets, so cuts can land on them. Each mode balances it its own way (`hopecore` has fewer keys and the
+  mug more often, `chaos` busy hands, `dwell` mostly the fan). There is no music menu: an earlier
+  generative ambient wash was taken out because it took away from the piece.
 - **Frame and haze**: the picture sits inside the frame, smaller than it, its edges feathered into the
-  dark; the footage is softened with a slight gaussian blur and then grained, so it reads as something seen
-  from a little way off. One fader drives all of it (`?edge=0.75` in the URL is the default; 0 is full
+  page; the footage is softened with a slight gaussian blur and then grained, so it reads as something seen
+  from a little way off. One fader drives all of it, and it loads at its fullest (`?edge=1`; 0 is full
   bleed, sharp and clean).
+- **The page**: by default the picture sits on an off-white page, like a print, with captions set in ink;
+  a cut to black is then a cut to the page, the vignette stays inside the picture and a flash blows out the
+  picture alone. `[ dark ]` in the controls puts it back on a black screen, `[ as the system has it ]`
+  follows the device; the choice is remembered in the browser.
 - **Clip audio through computer speakers**: when the footage's own sound surfaces (voice phrases, jump
   cuts) it arrives one layer removed, as if from a small speaker across the room: no low end, a rolled-off
   top, a cabinet resonance and a boxy dip, a touch of soft clipping, a short bright reflection, a narrowed
   image. Measured at the output: 31 dB down below 120 Hz, +7 dB at 2-3 kHz, 13 dB off above 8 kHz. The
   controls offer a tinnier phone-speaker voicing and the direct sound (`?clipfx=phone|direct`).
 - **Modes**: `corecore` (default), `online` (contemporary material with a cinematic treatment: slow
-  motion and speed ramps, vlog jump cuts, sound bleeding across cuts, a piano bed), `hopecore` (warmer,
+  motion and speed ramps, vlog jump cuts, sound bleeding across cuts), `hopecore` (warmer,
   quotes, no cut to black), `chaos` (the 2023 nichetok turn: layered, random speeds, textures), `dwell`
   (long takes only).
 - **Cinematic treatment**: every cycle picks a colour grade (cold, night, bleach, mono, warm, neutral:
@@ -139,12 +138,13 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 | v | cycle 16:9, 9:16, 1:1, 2.39:1 |
 | x | ban the current clip (removed from the pool for good) |
 
-The URL carries `seed`, `mode`, `aspect`, `music`, `slowed`, `tags`, `edge` and `clipfx`, so a link
-reproduces a stream over the same pool; `[ share this stream ]` in the controls copies it.
+The URL carries `seed`, `mode`, `aspect`, `tags`, `edge` and `clipfx`, so a link reproduces a stream over
+the same pool; `[ share this stream ]` in the controls copies it. The viewer itself carries no text: the
+status line (mode · seed · state) and the source of the clip on screen sit at the top of the controls.
 
 **The look.** The controls wear the elsewhere look: Roboto or Helvetica at 16, 14 and 13 px and one
-weight, everything lowercase, near-black and three grays with a warm and a cool accent, a light theme that
-follows the system (or `[ dark ]` / `[ light ]` in the controls). Every act and switch is a word in square
+weight, everything lowercase, off-white or near-black with three grays and a warm and a cool accent
+(`[ off-white ]`, `[ dark ]` or `[ as the system has it ]` in the controls; off-white is the default). Every act and switch is a word in square
 brackets, with no box, border, fill or icon; a button says what it did, or what it is waiting on, in its
 own brackets, and a status line under the picture carries mode, seed and state in fields separated by
 middle dots. There are no toasts, spinners or sounds from the interface.
@@ -206,7 +206,7 @@ Environment variables, all optional:
 
 | variable | default | meaning |
 | --- | --- | --- |
-| `CORECORE_MEDIA` | `./media` | where clips, thumbnails, music and the database live |
+| `CORECORE_MEDIA` | `./media` | where clips, thumbnails and the database live |
 | `CORECORE_SEGMENT_HEIGHT` | 720 | clip height; width follows the source aspect |
 | `CORECORE_SEGMENT_FORMAT` | mp4 | `mp4` (h264/aac) or `webm` (vp9/opus) |
 | `CORECORE_MIN_SHOT` / `CORECORE_MAX_SHOT` | 1.2 / 8.0 | shot length bounds in seconds; longer shots are carved into chunks |
@@ -236,8 +236,7 @@ Environment variables, all optional:
 | `GET /api/sources` | ingested sources with status, license and clip counts |
 | `GET /api/jobs`, `POST /api/jobs`, `POST /api/jobs/{id}/cancel` | the ingest queue |
 | `POST /api/seed` | queue the starter Internet Archive jobs |
-| `GET /api/music` | tracks in `media/music/` |
-| `GET /media/...` | clips, thumbnails, music (range requests supported) |
+| `GET /media/...` | clips and thumbnails (range requests supported) |
 
 ## Tests
 
@@ -257,6 +256,6 @@ web/                 the player: index.html, app.js, player.js, sequencer.js, au
 .github/workflows/   pages.yml (scrape + export + deploy), tests.yml
 docs/                CORECORE.md (research + rules), ROADMAP.md
 tests/               unit tests
-media/               created at runtime: segments/, thumbs/, music/, inbox/, sources/, corecore.sqlite3 (git-ignored)
+media/               created at runtime: segments/, thumbs/, inbox/, sources/, corecore.sqlite3 (git-ignored)
 site/                output of `export` / `build-site` (git-ignored)
 ```

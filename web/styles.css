@@ -2,17 +2,17 @@
    the night. nothing is drawn that is not a word, a one-pixel line, or the picture itself. */
 :root {
   --bg: #121212; --s1: #ffffff; --s2: #84858c; --s3: #4a4b52; --rule: #2e2e33; --focus: #ffffff;
-  --warm: #b17c77; --cool: #6e8494;
+  --warm: #b17c77; --cool: #6e8494; --field: #000000; color-scheme: dark;
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --bg: #fafafa; --s1: #121212; --s2: #85858c; --s3: #b9b9bf; --rule: #e4e4e6; --focus: #121212;
-    --warm: #9d6460; --cool: #5b7484;
+    --warm: #9d6460; --cool: #5b7484; --field: #fafafa; color-scheme: light;
   }
 }
 :root[data-theme="light"] {
   --bg: #fafafa; --s1: #121212; --s2: #85858c; --s3: #b9b9bf; --rule: #e4e4e6; --focus: #121212;
-  --warm: #9d6460; --cool: #5b7484;
+  --warm: #9d6460; --cool: #5b7484; --field: #fafafa; color-scheme: light;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
@@ -32,25 +32,20 @@ a:focus-visible { outline: 1px solid var(--focus); outline-offset: 4px; }
 .hidden { display: none !important; }
 
 /* the picture: the one thing drawn */
-#stage { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: contain; background: #000; display: block; }
+#stage { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: contain; background: var(--field); display: block; transition: background 0.7s ease; }
 #videos { position: fixed; left: -9999px; top: 0; width: 2px; height: 2px; opacity: 0.01; pointer-events: none; overflow: hidden; }
 #videos video { width: 2px; height: 2px; }
 
 /* the door */
-#splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); z-index: 20; cursor: pointer; padding: 16px; }
+#splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); z-index: 20; cursor: pointer; padding: 16px; transition: background 0.7s ease, color 0.7s ease; }
 .splash-inner { max-width: 620px; }
 .splash-inner h1 { font-size: 16px; margin: 0 0 6px; }
 .splash-inner p { margin: 0 0 18px; }
 .splash-inner .hint { margin-top: 28px; }
 .begin { letter-spacing: 0.02em; }
 
-/* the two lines under the picture */
-#status { position: fixed; left: 16px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); font-size: 13px; color: var(--s2); font-variant-numeric: tabular-nums; max-width: calc(100vw - 32px); pointer-events: none; z-index: 15; opacity: 0; transition: opacity 0.9s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#status.show { opacity: 1; }
-#status b { color: var(--warm); font-weight: 400; }
-#nowPlaying { position: fixed; right: 16px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); font-size: 13px; color: var(--s3); max-width: 45vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; z-index: 15; }
-body.hud-open #nowPlaying { right: calc(min(440px, 100vw) + 16px); max-width: calc(45vw - 200px); }
-body.hud-open #status { max-width: calc(55vw - 240px); }
+/* the status line and the source line, at the top of the controls; the viewer itself carries no text */
+.status { font-size: 13px; color: var(--s2); padding: 0 0 2px; min-height: 1.5em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* the acts and the switches: a word in brackets, colour and nothing else */
 .seg { display: flex; gap: 18px; flex-wrap: wrap; }
@@ -67,7 +62,7 @@ body.hud-open #status { max-width: calc(55vw - 240px); }
 .door[aria-checked="true"] { color: var(--cool); }
 .seg button:focus-visible, .act:focus-visible, .switch:focus-visible { outline: 1px solid var(--focus); outline-offset: 4px; }
 .inline { display: flex; gap: 24px; align-items: baseline; flex-wrap: wrap; padding: 12px 0; }
-.sect { padding: 18px 0 2px; color: var(--s2); font-size: 13px; }
+.sect { margin: 0; padding: 18px 0 2px; color: var(--s2); font-size: 13px; font-weight: 400; }
 
 /* the faders */
 .ctl { display: block; padding: 12px 0 10px; }
@@ -87,9 +82,11 @@ input[type="range"]::-moz-range-track { height: 1px; background: var(--rule); }
 input[type="range"]::-moz-range-thumb { width: 11px; height: 11px; border-radius: 50%; background: var(--s1); border: 0; }
 input[type="range"]:focus-visible { outline: 1px solid var(--focus); outline-offset: 4px; }
 
-/* the words you type: a one-pixel line under them, nothing around them */
+/* the words you type: a one-pixel line under them, nothing around them, no spinner, no grip */
 .field { display: block; color: var(--s2); font-size: 13px; padding: 8px 0 4px; }
-.field input, .field textarea { display: block; width: 100%; margin-top: 2px; font: inherit; font-size: 16px; color: var(--s1); background: transparent; border: 0; border-bottom: 1px solid var(--rule); padding: 4px 0; outline: none; resize: vertical; }
+.field input, .field textarea { display: block; width: 100%; margin-top: 2px; font: inherit; font-size: 16px; color: var(--s1); background: transparent; border: 0; border-bottom: 1px solid var(--rule); padding: 4px 0; outline: none; resize: none; }
+.field input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+.field input[type="number"]::-webkit-inner-spin-button, .field input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .field input:focus-visible, .field textarea:focus-visible { border-bottom-color: var(--focus); }
 .field.short { display: inline-block; width: auto; }
 .field.short input { width: 120px; }
@@ -98,14 +95,16 @@ input[type="range"]:focus-visible { outline: 1px solid var(--focus); outline-off
 body.static #ingest { display: none; }
 
 /* the controls, a column at the side with one line between it and the picture */
-#hud { position: fixed; top: 0; right: 0; height: 100vh; width: min(440px, 100vw); overflow-y: auto; background: var(--bg); border-left: 1px solid var(--rule); padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px)); z-index: 25; }
-#hud .head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
-#hud h1 { font-size: 16px; margin: 0; }
+#hud { position: fixed; top: 0; right: 0; height: 100vh; width: min(440px, 100vw); overflow-y: auto; background: var(--bg); border-left: 1px solid var(--rule); padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px)); z-index: 25; transition: background 0.7s ease, color 0.7s ease, border-color 0.7s ease; }
+#hud .head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+#hud h2 { font-size: 16px; margin: 0; }
 #stats { font-size: 13px; color: var(--s2); font-variant-numeric: tabular-nums; padding: 2px 0; }
 #stats b { color: var(--warm); font-weight: 400; }
 #tags { padding: 2px 0 6px; }
 details { font-size: 13px; color: var(--s2); padding: 6px 0; }
-details summary { cursor: pointer; list-style: none; }
+details summary { cursor: pointer; list-style: none; color: var(--s2); }
+@media (hover: hover) { details summary:hover { color: var(--warm); } }
+details summary:focus-visible { outline: 1px solid var(--focus); outline-offset: 4px; }
 details summary::-webkit-details-marker { display: none; }
 details ul { margin: 6px 0 0; padding-left: 0; list-style: none; max-height: 220px; overflow-y: auto; }
 details li { margin: 0 0 4px; }
@@ -113,8 +112,8 @@ details li { margin: 0 0 4px; }
 #jobs li { padding: 4px 0; border-top: 1px solid var(--rule); word-break: break-word; }
 #jobs li.running .st { color: var(--cool); }
 #jobs li.done .st { color: var(--s1); }
-#jobs li.failed .st, #jobs li.cancelled .st { color: var(--s3); }
-#jobs .act { font-size: 13px; margin-left: 12px; }
+#jobs li.failed .st, #jobs li.cancelled .st { color: var(--s2); }
+#jobs .act { font-size: 16px; margin-left: 12px; }
 .empty { font-size: 13px; color: var(--warm); padding: 4px 0; }
 .foot { margin-top: 44px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--s3); }
 @media (pointer: coarse) {

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 import os
-import urllib.parse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -173,14 +172,6 @@ def seed(set: str = "contemporary"):
     return {"queued": ids, "set": set}
 
 
-@app.get("/api/music")
-def music():
-    config.ensure_dirs()
-    tracks = sorted(p.name for p in config.MUSIC_DIR.iterdir()
-                    if p.is_file() and p.suffix.lower() in config.MUSIC_EXTENSIONS)
-    return {"tracks": [{"name": t, "url": f"media/music/{urllib.parse.quote(t)}"} for t in tracks]}
-
-
 @app.get("/")
 def index():
     return FileResponse(config.WEB_DIR / "index.html")
@@ -193,6 +184,6 @@ async def provider_error(_, exc: ProviderError):
 
 config.ensure_dirs()
 # Only the public subfolders are served: the database, the inbox and in-flight downloads also live under media/.
-for sub in ("segments", "thumbs", "music"):
+for sub in ("segments", "thumbs"):
     app.mount(f"/media/{sub}", StaticFiles(directory=str(config.MEDIA_DIR / sub)), name=f"media-{sub}")
 app.mount("/web", StaticFiles(directory=str(config.WEB_DIR)), name="web")

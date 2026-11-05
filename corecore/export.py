@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import random
 import shutil
-import urllib.parse
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -51,7 +50,7 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
     """`tags`: when given, only clips carrying at least one of these tags are exported (e.g. ["modern"] to
     publish the contemporary set from a pool that also holds archival material)."""
     out = Path(out)
-    for sub in ("clips", "thumbs", "web", "music"):
+    for sub in ("clips", "thumbs", "web"):
         (out / sub).mkdir(parents=True, exist_ok=True)
     # player
     for p in config.WEB_DIR.iterdir():
@@ -120,22 +119,14 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
         "provider": s["provider"], "tags": db.tags_from_db(s["tags"]), "query": s["query"],
     } for sid, s in sorted(sources.items()) if sid in used_sources]
 
-    music = []
-    if config.MUSIC_DIR.exists():
-        for p in sorted(config.MUSIC_DIR.iterdir()):
-            if p.is_file() and p.suffix.lower() in config.MUSIC_EXTENSIONS:
-                shutil.copy2(p, out / "music" / p.name)
-                music.append({"name": p.name, "url": f"music/{urllib.parse.quote(p.name)}"})
-
     manifest = {
         "version": 1,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "clips": manifest_clips,
         "sources": manifest_sources,
-        "music": music,
         "bytes": total,
     }
     (out / "manifest.json").write_text(json.dumps(manifest, separators=(",", ":")), encoding="utf-8")
-    summary = {"clips": len(manifest_clips), "sources": len(manifest_sources), "bytes": total, "music": len(music), "out": str(out)}
+    summary = {"clips": len(manifest_clips), "sources": len(manifest_sources), "bytes": total, "out": str(out)}
     log(f"done: {summary['clips']} clips from {summary['sources']} sources, {total // 2**20} MB")
     return summary
