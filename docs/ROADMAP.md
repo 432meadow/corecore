@@ -25,17 +25,17 @@ Rough order of usefulness. Nothing here is started.
   and bursts land on the grid, not just on the next loud transient.
 - **Caption sources**: pull captions from the clip's own transcript, the source title, or an LLM given
   the current contrast pair.
-- **More treatments**: chromatic aberration, VHS tracking, datamosh-style frame holds, interlacing,
-  timestamp overlays for CCTV material, TikTok-style caption boxes. Most want WebGL rather than canvas 2D.
+- **More treatments**: VHS tracking, datamosh-style frame holds, interlacing, a paper texture for the
+  off-white page. Most want WebGL rather than canvas 2D. No platform overlays: this is cinema, not a feed.
 - **Hand-authored cycles**: let a user write a phrase list in JSON and share it with the seed.
-- **Audio-reactive zoom** (push in on the music's energy envelope) and sidechain-style ducking on cuts.
+- **Sound-reactive zoom** (push in on the desk's energy envelope) and sidechain-style ducking on cuts.
 
 ## Output
 - **Server-side render**: the client already produces a deterministic edit decision list per seed. Post it
   to an endpoint that renders the same list with ffmpeg (concat + zoompan + noise + vignette) to an mp4,
   for sharing without screen recording. WebM from the in-browser recorder is the stopgap.
 - **HLS / WebRTC "channel"**: the static live channel syncs viewers by clock and deterministic sequencing;
-  a server-rendered stream would make the sync exact and allow music with real transients.
+  a server-rendered stream would make the sync exact, down to each click of the desk.
 - **Vertical export presets** (TikTok, Reels, Shorts safe areas).
 
 ## Operations

@@ -79,7 +79,7 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   motif clips that come back, and durations/speeds/treatments from the current mode's parameters.
 - **Player** (`web/player.js`): cuts on the AudioContext clock, cover-fits clips with a slow push-in,
   adds grain, vignette, flashes, letterboxing, shake, double exposure, freeze frames and captions, and
-  lets strong music onsets pull a cut forward.
+  lets the desk's clicks and keystrokes pull a cut forward.
 - **The desk** (`web/desk.js`): the only sound there is. Instead of music, a room with a computer in it:
   a PC fan with a blade tone that speeds up when the edit gets frantic, typing in words with spaces and
   the odd backspace, mouse clicks and scroll-wheel ticks, the mouse sliding, a mug set down now and then,
@@ -146,8 +146,8 @@ status line (mode · seed · state) and the source of the clip on screen sit at 
 weight, everything lowercase, off-white or near-black with three grays and a warm and a cool accent
 (`[ off-white ]`, `[ dark ]` or `[ as the system has it ]` in the controls; off-white is the default). Every act and switch is a word in square
 brackets, with no box, border, fill or icon; a button says what it did, or what it is waiting on, in its
-own brackets, and a status line under the picture carries mode, seed and state in fields separated by
-middle dots. There are no toasts, spinners or sounds from the interface.
+own brackets, and a status line at the top of the controls carries mode, seed and state in fields separated
+by middle dots. There are no toasts, spinners or sounds from the interface, and no text on the viewer.
 
 ## Sources
 
