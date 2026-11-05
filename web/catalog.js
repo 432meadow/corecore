@@ -130,6 +130,8 @@ export class Catalog {
     this.markBad(id);
     await fetch(`api/clips/${id}/ban`, { method: 'POST' });
   }
+
+  banLines() { return null; }   // here a ban goes straight into the pool: nothing to copy
 }
 
 export function computeStats(clips) {
@@ -156,6 +158,7 @@ export class StaticCatalog extends Catalog {
     this.all = null;
     this.everything = null;
     this.manifest = null;
+    this.banned = new Set();   // the bans made in this browser (this.bad also holds clips that failed to load)
   }
 
   setTags(tags) {
@@ -190,6 +193,7 @@ export class StaticCatalog extends Catalog {
         source_title: s.title || '',
         source_uploader: s.uploader || '',
         source_url: s.url || '',
+        source_key: s.key || '',
         provider: s.provider || '',
         license: s.license || '',
       };
@@ -198,7 +202,7 @@ export class StaticCatalog extends Catalog {
     this.everything = this.all;
     this.all = this.filtered();
     try {
-      for (const id of JSON.parse(localStorage.getItem('corecore.banned') || '[]')) this.bad.add(id);
+      for (const id of JSON.parse(localStorage.getItem('corecore.banned') || '[]')) { this.bad.add(id); this.banned.add(id); }
     } catch (e) { /* no storage */ }
     this.recomputeStats();
     return this.all;
@@ -231,7 +235,16 @@ export class StaticCatalog extends Catalog {
 
   async ban(id) {
     this.markBad(id);
+    this.banned.add(id);
     if (this.all) this.recomputeStats();
-    try { localStorage.setItem('corecore.banned', JSON.stringify([...this.bad])); } catch (e) { /* no storage */ }
+    try { localStorage.setItem('corecore.banned', JSON.stringify([...this.banned])); } catch (e) { /* no storage */ }
+  }
+
+  // This browser's bans as lines for bans.txt in the repository: pasted there, the next build leaves those
+  // clips out for everyone. A clip is named by its source and where it starts in it, which outlives the pool.
+  banLines() {
+    const byId = new Map((this.everything || []).map((c) => [c.id, c]));
+    return [...this.banned].map((id) => byId.get(id)).filter((c) => c && c.source_key && c.start != null)
+      .map((c) => `${c.source_key}@${c.start}   # ${(c.source_title || '').replace(/\s+/g, ' ').slice(0, 90)}`);
   }
 }

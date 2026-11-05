@@ -429,6 +429,14 @@ function wire() {
   document.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b && e.detail > 0) b.blur(); });
   $('#next').addEventListener('click', () => { player.nextPhrase(); say($('#next'), 'next'); });
   $('#ban').addEventListener('click', () => banCurrent($('#ban')));
+  $('#copyBans').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;   // gone from the event once we have awaited
+    const lines = catalog.banLines();
+    if (lines === null) return say(btn, 'bans here go straight into the pool', 4000);
+    if (!lines.length) return say(btn, 'no bans yet');
+    const text = `# bans from ${location.host}, ${new Date().toISOString().slice(0, 10)}\n${lines.join('\n')}\n`;
+    try { await navigator.clipboard.writeText(text); say(btn, `${lines.length} copied, for bans.txt`, 4000); } catch (err) { window.prompt('your bans, for bans.txt', text); }
+  });
   $('#info').addEventListener('click', () => setInfo(!player.showInfo));
   $('#hideHud').addEventListener('click', () => setHud(false));
   $('#jobForm').addEventListener('submit', submitJob);

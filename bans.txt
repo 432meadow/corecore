@@ -1,0 +1,8 @@
+# Bans made on the live site. [ ban this clip ] (key x) hides a clip in the browser it was pressed in;
+# [ copy bans ] copies that browser's bans as lines like the ones below. Paste them here and the next
+# build leaves those clips out for everyone. Nothing is deleted: take a line out and the clip comes back.
+#
+#   archive:tiktok-7130942596586818818@12.5    one clip: its source, and where it starts in it (seconds)
+#   archive:tiktok-7130942596586818818          a line without @: every clip of that source
+#
+# Anything after a # is a note.

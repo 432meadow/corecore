@@ -170,6 +170,13 @@ lower part of the screen with the picture still in view above; every word in bra
 and `[ pause ]` stands in for the space bar. On a computer a click on the picture does the same. The viewer itself carries no text: the
 status line (mode · seed · state) and the source of the clip on screen sit at the top of the controls.
 
+**Moderating.** On the published site `[ ban this clip ]` (key `x`) hides the clip on screen in that
+browser at once. `[ copy bans ]` copies that browser's bans as lines naming each clip by its source and the
+second it starts at (`archive:tiktok-7130942596586818818@12.5`); pasted into `bans.txt`, they hold for
+everyone from the next build. Nothing is deleted, so a line taken out brings its clip back; a line without
+`@` takes out every clip of a source. Footage that must never show goes in `BANNED_SOURCES` in
+`corecore/config.py` instead, which deletes it from the pool.
+
 **The look.** The controls wear the elsewhere look: Roboto or Helvetica at 16, 14 and 13 px and one
 weight, everything lowercase, off-white or near-black with three grays and a warm and a cool accent
 (`[ off-white ]`, `[ dark ]` or `[ as the system has it ]` in the controls; off-white is the default). Every act and switch is a word in square

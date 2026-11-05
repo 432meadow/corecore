@@ -80,11 +80,14 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
     conn = db.connect()
     try:
         rows = conn.execute(
-            "SELECT c.*, s.title AS source_title, s.uploader AS source_uploader FROM clips c JOIN sources s ON s.id = c.source_id "
+            "SELECT c.*, s.title AS source_title, s.uploader AS source_uploader, s.provider AS source_provider, "
+            "s.external_id AS source_external_id FROM clips c JOIN sources s ON s.id = c.source_id "
             "WHERE c.banned = 0 ORDER BY c.id").fetchall()
         rows = [dict(r) for r in rows]
         # the blocklist is applied again here: it may have grown since a source was scraped into the pool
         rows = [r for r in rows if not config.blocked_source(r.get("source_title"), r.get("source_uploader"))]
+        # and the bans made on the live site (bans.txt)
+        rows = [r for r in rows if not config.banned_clip(f"{r['source_provider']}:{r['source_external_id']}", r.get("start"))]
         if tags:
             wanted = {t.strip().lower() for t in tags if t.strip()}
             rows = [r for r in rows if wanted & set(db.tags_from_db(r["tags"]))]
@@ -126,10 +129,12 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
             "duration": r["duration"], "width": r["width"], "height": r["height"], "has_audio": bool(r["has_audio"]),
             "brightness": r["brightness"], "saturation": r["saturation"], "motion": r["motion"], "loudness": r["loudness"],
             "faces": r.get("faces") or 0, "tags": db.tags_from_db(r["tags"]),
+            "start": round(r["start"], 2) if r.get("start") is not None else None,
         })
 
     manifest_sources = [{
-        "id": s["id"], "title": s["title"], "uploader": s["uploader"], "url": s["url"], "license": s["license"],
+        "id": s["id"], "key": f"{s['provider']}:{s['external_id']}", "title": s["title"], "uploader": s["uploader"],
+        "url": s["url"], "license": s["license"],
         "provider": s["provider"], "tags": db.tags_from_db(s["tags"]), "query": s["query"],
     } for sid, s in sorted(sources.items()) if sid in used_sources]
 

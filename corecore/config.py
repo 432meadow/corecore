@@ -130,6 +130,47 @@ BANNED_SOURCES: set[str] = {
 }
 
 
+# Bans made on the live site: [ ban this clip ] (key x) hides a clip in that browser, [ copy bans ] copies the
+# browser's bans as lines for bans.txt, and the next build leaves those clips out for everyone. Unlike
+# BANNED_SOURCES nothing is deleted: take a line out and the clip comes back with the next build.
+BANS_FILE = Path(os.environ.get("CORECORE_BANS", ROOT / "bans.txt"))
+
+
+def read_bans(path: Path | str = BANS_FILE) -> tuple[set[str], dict[str, list[float]]]:
+    """Lines "provider:external_id@start" ban one clip (start in seconds within its source); a line without
+    "@start" bans every clip of that source. Anything after "#" is a note."""
+    whole: set[str] = set()
+    clips: dict[str, list[float]] = {}
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return whole, clips
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        key, at, start = line.partition("@")
+        key = key.strip()
+        if ":" not in key:
+            continue
+        if not at:
+            whole.add(key)
+            continue
+        try:
+            clips.setdefault(key, []).append(float(start))
+        except ValueError:
+            continue
+    return whole, clips
+
+
+BANS = read_bans()
+
+
+def banned_clip(source_key: str, start: float | None, bans: tuple[set[str], dict[str, list[float]]] | None = None) -> bool:
+    whole, clips = bans or BANS
+    if source_key in whole:
+        return True
+    return start is not None and any(abs(start - s) < 0.06 for s in clips.get(source_key, ()))
+
+
 _BLOCK_RE = re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(w) for w in BLOCKLIST) + r")(?![a-z0-9])") if BLOCKLIST else None
 _HARD_RE = re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(w) for w in HARD_BLOCKLIST) + r")(?![a-z0-9])")
 

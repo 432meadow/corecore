@@ -226,6 +226,49 @@ class ExportTest(unittest.TestCase):
             chosen, _ = select_clips(rows, media, max_bytes=10 ** 9, max_clips=5)
             self.assertEqual(len(chosen), 5)
 
+    def test_bans_from_the_live_site_are_left_out_of_the_export(self):
+        from corecore.export import export_site
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "bans.txt"
+            f.write_text("# bans from example.org\n"
+                         "archive:tiktok-1@12.5   # a clip\n"
+                         "archive:twitter-9        # a whole source\n"
+                         "not a line\narchive:tiktok-1@x\n")
+            bans = config.read_bans(f)
+            self.assertEqual(bans, ({"archive:twitter-9"}, {"archive:tiktok-1": [12.5]}))
+            self.assertTrue(config.banned_clip("archive:tiktok-1", 12.53, bans))
+            self.assertFalse(config.banned_clip("archive:tiktok-1", 13.0, bans))
+            self.assertFalse(config.banned_clip("archive:tiktok-1", None, bans))
+            self.assertTrue(config.banned_clip("archive:twitter-9", 0.0, bans))
+            self.assertEqual(config.read_bans(Path(d) / "missing.txt"), (set(), {}))
+        db.init()
+        with db.connect() as conn:
+            conn.execute("DELETE FROM sources")
+            conn.execute("INSERT INTO sources (provider, external_id, url, title, status, tags) VALUES "
+                         "('archive', 'tiktok-1', 'https://archive.org/details/tiktok-1', 'a day in my life', 'done', ',modern,')")
+            sid = conn.execute("SELECT id FROM sources WHERE external_id = 'tiktok-1'").fetchone()["id"]
+            for i, start in enumerate((0.0, 12.5)):
+                seg = config.SEGMENTS_DIR / f"ban_{i}.mp4"
+                subprocess.run([config.FFMPEG, "-y", "-loglevel", "error", "-t", "1", "-f", "lavfi", "-i", "testsrc=s=160x90:r=10",
+                                "-c:v", "libx264", "-preset", "ultrafast", str(seg)], check=True)
+                conn.execute("INSERT INTO clips (source_id, file, start, duration, width, height, has_audio, tags) VALUES "
+                             "(?, ?, ?, 1.0, 160, 90, 0, ',modern,')", (sid, f"segments/ban_{i}.mp4", start))
+        saved = config.BANS
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                config.BANS = (set(), {})
+                m = export_site(Path(d) / "all", log=lambda x: None)
+                self.assertEqual(m["clips"], 2)
+                manifest = json.loads((Path(d) / "all" / "manifest.json").read_text())
+                self.assertEqual(manifest["sources"][0]["key"], "archive:tiktok-1")   # what [ copy bans ] names
+                self.assertEqual(sorted(c["start"] for c in manifest["clips"]), [0.0, 12.5])
+                config.BANS = (set(), {"archive:tiktok-1": [12.5]})
+                self.assertEqual(export_site(Path(d) / "one", log=lambda x: None)["clips"], 1)
+                config.BANS = ({"archive:tiktok-1"}, {})
+                self.assertEqual(export_site(Path(d) / "none", log=lambda x: None)["clips"], 0)
+        finally:
+            config.BANS = saved
+
     def test_export_site_writes_manifest(self):
         from corecore.export import export_site
         db.init()
