@@ -154,6 +154,12 @@ a link reproduces a stream over the same pool; `[ share this stream ]` in the co
 half a second and the sound with it, a full second of silence on the empty page, then the new stream fades
 in, picture and sound together. A second switch made during the fade takes its place.
 
+**No standing start.** A clip does not start from a still frame at its cut. The next one starts playing,
+muted and unseen, half a second before its cut on a phone (a fifth of a second on a computer), so it is
+already moving when it appears, and its sound comes up at the cut. The lead grows to what the device is
+seen to need, up to a second and a half, where clips are slow to start. A clip cued at the head of its
+file, such as a voice, plays its lead at a tenth of its speed instead, so the first words are kept.
+
 **On a phone.** The picture opens in the vertical frame (9:16), with frame and haze at 0.40, and follows the phone as it turns, until a
 frame is chosen by hand. A tap on the picture opens and closes the controls, which rise as a sheet over the
 lower part of the screen with the picture still in view above; every word in brackets is a 44 px target,

@@ -7,6 +7,10 @@ const POOL_SIZE = 8;
 const AHEAD = 5;
 const QUEUE_MIN = 10;
 const FLASH_SECONDS = 0.14;
+// A clip cued too near the head of its file to be backed up for the pre-roll creeps up to its cut instead,
+// rolling at this fraction of its speed, so it still arrives on (near enough) the frame the edit asked for.
+const CREEP = 0.1;
+const PREROLL_MAX = 1.5;   // seconds: the longest the pre-roll grows to on a device slow to start a clip
 // The page behind the picture. Dark is the screen; light is an off-white sheet, where captions are set in
 // ink with a pale halo and the vignette is gentler, so the picture reads as a print rather than a window.
 const FIELDS = {
@@ -26,6 +30,17 @@ function waitEvent(el, ev, timeout) {
     const timer = setTimeout(() => { cleanup(); reject(new Error(`timeout waiting for ${ev}`)); }, timeout);
     el.addEventListener(ev, ok, { once: true });
     el.addEventListener('error', bad, { once: true });
+  });
+}
+
+// A little of what follows the current frame, so a clip's first moments do not wait on the network. Never
+// fails: past the timeout the clip goes ahead with what it has.
+function waitData(el, timeout) {
+  return new Promise((resolve) => {
+    if (el.readyState >= 3) return resolve();
+    const done = () => { clearTimeout(timer); el.removeEventListener('canplay', done); resolve(); };
+    const timer = setTimeout(done, timeout);
+    el.addEventListener('canplay', done, { once: true });
   });
 }
 
@@ -79,6 +94,13 @@ export class Player {
     this.flashStrength = 0;
     this.showInfo = false;
     this.snapEnabled = true;
+    // the pre-roll: the next clip starts playing this long before its cut, unseen and silent, so at the cut it
+    // is already moving. A phone takes a few hundred milliseconds to start a standing clip, longer where it
+    // fetches nothing ahead (iOS), so the lead grows to what this device has been seen to need.
+    this.prerollMin = matchMedia('(pointer: coarse)').matches ? 0.5 : 0.2;
+    this.preroll = this.prerollMin;
+    this.startLag = 0;   // seconds a rolled clip has lately taken to start moving: the slowest at once, decaying
+    this.rolled = null;  // the cue rolled last, watched until it moves
     this.waitingSince = null;
     this.scratch = {};
     this.edge = 1;           // 0 = full bleed; 1 = a small, soft picture with wide hazy edges (the default)
@@ -285,6 +307,7 @@ export class Player {
       return;
     }
     try { slot.el.pause(); } catch (e) { /* ignore */ }
+    slot.el.muted = false;   // a rolled clip dropped before its cut
     this.audio.setClipGain(slot.el, 0);
     this.audio.closeSend(slot.el);
     slot.busy = false;
@@ -381,10 +404,16 @@ export class Player {
         await waitEvent(el, 'loadedmetadata', 8000);
         if (abandoned()) { this.release(slot); cue.preparing = false; return; }
       }
-      el.playbackRate = cue.speed;
+      const rate = Math.max(0.1, Math.min(4, cue.ramp ? cue.ramp.from : cue.speed));
       el.defaultPlaybackRate = cue.speed;
-      el.currentTime = cue.offset;
+      el.playbackRate = rate;
+      // cued a little before its start, so that rolling from there for `lead` seconds brings it to the start;
+      // too near the head of the file to back up that far (a voice starts at 0), it creeps there instead
+      cue.lead = this.preroll;
+      cue.creep = cue.offset < this.preroll * rate ? CREEP : 0;
+      el.currentTime = Math.max(0, cue.offset - this.preroll * (cue.creep || rate));
       await waitSeek(el, 8000);
+      await waitData(el, 1500);
       if (abandoned()) { this.release(slot); cue.preparing = false; return; }
       cue.slot = slot;
       cue.ready = true;
@@ -494,9 +523,10 @@ export class Player {
     next.end = this.origin != null && next.at != null ? Math.max(now + 0.1, this.origin + next.at + next.dur) : now + next.dur;
     if (next.kind === 'clip') {
       const el = next.slot.el;
+      el.muted = false;   // it rolled muted
       this.audio.setClipGain(el, next.audio.clip || 0);
-      if (next.ramp) el.playbackRate = Math.max(0.1, Math.min(4, next.ramp.from));
-      el.play().catch(() => {});
+      el.playbackRate = Math.max(0.1, Math.min(4, next.ramp ? next.ramp.from : next.speed));   // a creep ends here
+      if (el.paused) el.play().catch(() => {});   // rolling already: nothing to start
       if (next.fx.hold) next.holdAt = now + next.dur * 0.8;
     }
     this.audio.duck(next.audio?.duck ?? 1);
@@ -569,6 +599,8 @@ export class Player {
       cur.slot.el.pause();
       cur.holdAt = null;
     }
+    this.rollNext(now);
+    this.watchRoll();
     if (cur?.kind === 'clip' && cur.ramp && cur.slot && !cur.slot.el.paused) {
       const prog = Math.min(1, Math.max(0, (now - cur.start) / cur.dur));
       const e = prog * prog * (3 - 2 * prog);
@@ -576,6 +608,57 @@ export class Player {
       if (Math.abs(rate - cur.slot.el.playbackRate) > 0.03) cur.slot.el.playbackRate = rate;
     }
     this.render(now);
+  }
+
+  // Roll the next clip `lead` seconds before its cut, muted: it is silent until the cut anyway, and a muted
+  // video may play beside the one on screen, where iOS lets only one video with sound play at a time and
+  // would pause the other. Not while the cut's time is unknown (a clip still loading, the silence between
+  // streams): then it starts at the cut, as before.
+  rollNext(now) {
+    const c = this.current, n = this.queue[0];
+    if (!c || !n || n.kind !== 'clip' || !n.ready || n.rolling || !n.slot || n.dropped) return;
+    if (c.kind === 'black' && c.phrase === 'wait') return;
+    if (now < c.end - (n.lead ?? this.preroll)) return;
+    const el = n.slot.el;
+    n.rolling = true;
+    n.rolledFrom = el.currentTime;
+    n.rolledAt = performance.now();
+    n.startedIn = null;
+    el.muted = true;
+    if (n.creep) el.playbackRate = n.creep;
+    el.play().catch(() => {});
+    this.rolled = n;
+  }
+
+  // Watch the clip rolled last until it moves. Then time its start, so the pre-roll follows this device,
+  // and if it is still off screen draw it once, a pixel big, where this frame's paint covers it: Safari starts
+  // handing a video's frames to a canvas only when first asked, and the first ask waits for a frame, which is
+  // better spent now, unseen, than at the cut.
+  watchRoll() {
+    const n = this.rolled;
+    if (!n || n.startedIn != null) return;
+    const el = n.slot?.el;
+    if (!el || n.dropped) { this.rolled = null; return; }
+    const waited = performance.now() - n.rolledAt;
+    if (el.paused || el.currentTime - n.rolledFrom < 0.01 * (n.creep || el.playbackRate)) {
+      if (waited > 4000) this.rolled = null;   // never seen to start (paused meanwhile): no reading
+      return;
+    }
+    n.startedIn = waited / 1000;
+    if (!n.creep) {   // a creep is slow to show it is moving at all, and says nothing of a start at speed
+      this.startLag = n.startedIn > this.startLag ? n.startedIn : this.startLag * 0.8 + n.startedIn * 0.2;
+      this.preroll = Math.min(PREROLL_MAX, Math.max(this.prerollMin, this.startLag + 0.25));
+    }
+    this.rolled = null;
+    if (this.queue[0] !== n || el.readyState < 2) return;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.filter = 'none';
+    try { ctx.drawImage(el, 0, 0, 1, 1); } catch (e) { /* not drawable yet: no matter */ }
+    ctx.restore();
   }
 
   render(now) {
@@ -924,6 +1007,7 @@ export class Player {
     this.paused = true;
     this.current?.slot?.el.pause();
     this.previous?.slot?.el.pause();
+    for (const q of this.queue) if (q.rolling && q.slot) { try { q.slot.el.pause(); } catch (e) { /* ignore */ } q.rolling = false; }
     if (this.audio.ctx) await this.audio.ctx.suspend();
   }
 
