@@ -52,6 +52,16 @@ def _text(v) -> str:
     return str(v)
 
 
+# Mirrored short-form posts keep their caption in the description ("TikTok Video by <user>" is often all the
+# title says), so for these the general blocklist reads the caption too. A YouTube description is long and full
+# of links and sponsor copy, so the mirror of YouTube stays judged by its titles.
+_SOCIAL_PREFIXES = ("tiktok-", "instagram-", "twitter-")
+
+
+def caption_blocked(ident: str | None, description: str | None) -> bool:
+    return (ident or "").lower().startswith(_SOCIAL_PREFIXES) and config.blocked_title(description)
+
+
 def hard_blocked_metadata(md: dict) -> bool:
     return config.hard_blocked(" ".join(_text(md.get(k)) for k in ("title", "description", "subject", "creator")))
 
@@ -151,6 +161,8 @@ class ArchiveProvider(Provider):
             if not ident or config.blocked_source(str(_first(d.get("title")) or ""), str(_first(d.get("creator")) or "")):
                 continue
             if config.hard_blocked(_text(d.get("description")) + " " + _text(d.get("subject"))):
+                continue
+            if caption_blocked(ident, _text(d.get("description"))):
                 continue
             if f"archive:{ident}" in config.BANNED_SOURCES:
                 continue

@@ -14,7 +14,7 @@ on:
         description: size budget of the exported site in MB
         default: "600"
       seed_set:
-        description: "which starter set to scrape: contemporary (mirrored web video), archival (public domain), all"
+        description: "which starter set to scrape: contemporary (mirrored web video), internet (social clips, weird happenings, vlogs), beauty, archival (public domain), all"
         default: "contemporary"
       restore_key:
         description: "to recover a pool: restore this exact cache key (corecore-media-<run id>) instead of the newest"

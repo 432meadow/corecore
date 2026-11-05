@@ -237,6 +237,18 @@ REINSTATED = [
     )
 ]
 
+# INTERNET_JOBS: the pool had come to lean on nature and animals, so the owner asked for more of the internet
+# itself: social media, weird happenings, vlogs. The set is the queries above that bring those (phone posts,
+# vlogs, cameras catching odd things, liminal places; not the pets, weather and nature ones), plus
+# NEW_INTERNET_JOBS, scouted for it. `--set internet` scrapes just these; weekly builds keep them in rotation.
+NEW_INTERNET_JOBS: list[dict] = []
+_INTERNET_KINDS = {"vlog", "phone", "reels", "cctv", "liminal", "asmr"}
+INTERNET_JOBS = NEW_INTERNET_JOBS + [
+    j for j in CONTEMPORARY_JOBS
+    if _INTERNET_KINDS & set(j["tags"]) and not {"beauty", "animals", "nature"} & set(j["tags"]) and j["provider"] == "archive"]
+CONTEMPORARY_JOBS = CONTEMPORARY_JOBS + NEW_INTERNET_JOBS
+
 BEAUTY_JOBS = [j for j in CONTEMPORARY_JOBS if "beauty" in j["tags"]]
-SEED_SETS = {"contemporary": CONTEMPORARY_JOBS, "beauty": BEAUTY_JOBS, "archival": ARCHIVAL_JOBS, "all": CONTEMPORARY_JOBS + ARCHIVAL_JOBS}
+SEED_SETS = {"contemporary": CONTEMPORARY_JOBS, "internet": INTERNET_JOBS, "beauty": BEAUTY_JOBS, "archival": ARCHIVAL_JOBS,
+             "all": CONTEMPORARY_JOBS + ARCHIVAL_JOBS}
 STARTER_JOBS = CONTEMPORARY_JOBS  # what `seed` and `build-site` use unless --set says otherwise

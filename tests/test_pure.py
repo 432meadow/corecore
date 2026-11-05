@@ -139,6 +139,16 @@ class HardBlockTest(unittest.TestCase):
         self.assertTrue(config.blocked_title("Except dog crap. And violence. And Champ."))
         self.assertFalse(config.blocked_source("Kitten Wrasslin' on the bed", "Nina Paley"))
 
+    def test_social_captions_are_read_by_the_general_blocklist(self):
+        from corecore.providers.archive import caption_blocked
+        # a mirrored post titled only "TikTok Video by <user>" carries its caption in the description
+        self.assertTrue(caption_blocked("tiktok-7130942596586818818", "link in bio #nsfw #fyp"))
+        self.assertTrue(caption_blocked("Instagram-DdeICa9AIqS", "Breaking news from the rally"))
+        self.assertTrue(caption_blocked("twitter-1295991588083163136", "he got punched lol"))
+        self.assertFalse(caption_blocked("tiktok-1", "a whole day alone in my flat #vlog #dayinmylife"))
+        # a YouTube description is long and full of links and sponsor copy: the mirror stays judged by titles
+        self.assertFalse(caption_blocked("youtube-FtWXWKUK6rg", "subscribe for more reviews and news"))
+
     def test_put_back_sources_are_not_banned(self):
         from corecore import seeds
         idents = {f"{j['provider']}:{j['url'].rsplit('/', 1)[-1]}" for j in seeds.REINSTATED}
@@ -439,7 +449,9 @@ class ContemporaryTest(unittest.TestCase):
 
     def test_seed_sets(self):
         from corecore import seeds
-        self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "beauty", "archival", "all"})
+        self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "internet", "beauty", "archival", "all"})
+        self.assertTrue(seeds.INTERNET_JOBS and all("modern" in j["tags"] and j["provider"] == "archive" for j in seeds.INTERNET_JOBS))
+        self.assertTrue(all(j in seeds.CONTEMPORARY_JOBS for j in seeds.INTERNET_JOBS))   # weekly builds keep them in rotation
         self.assertTrue(all("beauty" in j["tags"] for j in seeds.BEAUTY_JOBS) and len(seeds.BEAUTY_JOBS) >= 10)
         self.assertTrue(all(j["provider"] in ("archive", "dailymotion") for j in seeds.CONTEMPORARY_JOBS))
 
