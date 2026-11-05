@@ -2,8 +2,10 @@
 The exported index.html flips the player into static mode: clips come from manifest.json instead of the API."""
 from __future__ import annotations
 
+import hashlib
 import json
 import random
+import re
 import shutil
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -12,6 +14,8 @@ from pathlib import Path
 from . import config, db, ffmpeg
 
 STATIC_TAG = '<script>window.CORECORE_STATIC = "manifest.json";</script>'
+# an import between the player's modules: from './audio.js'
+_IMPORT_RE = re.compile(r"""(\bfrom\s+['"]\./[^'"?]+\.js)(['"])""")
 
 
 def select_clips(rows: list, media_dir: Path, max_bytes: int, max_clips: int) -> tuple[list, int]:
@@ -52,11 +56,21 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
     out = Path(out)
     for sub in ("clips", "thumbs", "web"):
         (out / sub).mkdir(parents=True, exist_ok=True)
-    # player
-    for p in config.WEB_DIR.iterdir():
-        if p.is_file() and p.name != "index.html":
+    # player. Every script and stylesheet address carries a version, a hash of the player's own code, so a
+    # page never meets scripts from another deploy in a CDN's cache (which holds files for minutes): the page
+    # links ?v=<hash>, and so does every import between the modules.
+    files = sorted(p for p in config.WEB_DIR.iterdir() if p.is_file() and p.name != "index.html")
+    version = hashlib.sha1(b"".join(p.name.encode() + p.read_bytes() for p in files)).hexdigest()[:10]
+    for p in files:
+        if p.suffix == ".js":
+            code = p.read_text(encoding="utf-8")
+            code = _IMPORT_RE.sub(lambda m: f"{m.group(1)}?v={version}{m.group(2)}", code)
+            (out / "web" / p.name).write_text(code, encoding="utf-8")
+        else:
             shutil.copy2(p, out / "web" / p.name)
     index = (config.WEB_DIR / "index.html").read_text(encoding="utf-8")
+    index = index.replace('href="web/styles.css"', f'href="web/styles.css?v={version}"')
+    index = index.replace('src="web/app.js"', f'src="web/app.js?v={version}"')
     marker = '<script type="module"'
     if STATIC_TAG not in index:
         index = index.replace(marker, STATIC_TAG + "\n  " + marker, 1)

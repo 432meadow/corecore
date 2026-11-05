@@ -244,6 +244,12 @@ class ExportTest(unittest.TestCase):
             self.assertTrue((out / "clips" / "exp_000.mp4").exists())
             self.assertTrue((out / "web" / "app.js").exists())
             self.assertIn('window.CORECORE_STATIC = "manifest.json"', (out / "index.html").read_text())
+            # one version on every address, so a CDN never mixes scripts from two deploys
+            page, app = (out / "index.html").read_text(), (out / "web" / "app.js").read_text()
+            v = page.split('src="web/app.js?v=', 1)[1].split('"', 1)[0]
+            self.assertIn(f'href="web/styles.css?v={v}"', page)
+            self.assertIn(f"from './audio.js?v={v}'", app)
+            self.assertNotRegex(app, r"from '\./[a-z]+\.js'")
             self.assertTrue((out / ".nojekyll").exists())
         with db.connect() as conn:
             conn.execute("DELETE FROM sources")
