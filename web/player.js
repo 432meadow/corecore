@@ -603,10 +603,12 @@ export class Player {
     this.drawOverlays(now, c);
   }
 
-  // In a 16:9 or 1:1 frame a portrait clip fills the frame edge to edge, cropped: no blurred sides and no
-  // letterbox bars, which would leave a phone clip a sliver. A 2.39:1 frame still shows it whole, since a
-  // fill there would keep only a quarter of its height.
+  // Clips fill the frame edge to edge, cropped, with no blurred sides and no letterbox bars: in a 9:16 frame
+  // every clip (a landscape one keeps its middle; bars there would shrink it to a band across the middle),
+  // in a 16:9 or 1:1 frame a portrait clip (bars or sides would leave a phone clip a sliver). A 2.39:1
+  // frame still shows a portrait clip whole, since a fill there would keep only a quarter of its height.
   fillsFrame(cue) {
+    if (this.aspect === '9:16') return true;
     if (this.aspect !== '16:9' && this.aspect !== '1:1') return false;
     const el = cue.slot?.el;
     const w = el?.videoWidth || cue.clip?.width, h = el?.videoHeight || cue.clip?.height;
@@ -650,8 +652,15 @@ export class Player {
       dw = iw * scale; dh = ih * scale;
       const ox = (dw - vw) / 2, oy = (dh - vh) / 2;
       // a phone clip cropped to a wide frame keeps its upper middle, where the faces usually are
-      const py = fill ? Math.max(-1, Math.min(1, cue.pan.y * 0.6 - 0.22)) : cue.pan.y;
-      dx = vx - ox - cue.pan.x * ox;
+      const py = fill && oy > 0 ? Math.max(-1, Math.min(1, cue.pan.y * 0.6 - 0.22)) : cue.pan.y;
+      // a wide clip cropped to a tall frame loses two thirds of its width, so rather than sit still on one
+      // part it drifts slowly across (a tenth of the frame a second, eased), and what it holds passes through
+      let px = cue.pan.x;
+      if (fill && ox > vw) {
+        const sweep = Math.min(0.5, (0.1 * vw / ox) * cue.dur);
+        px = Math.max(-1, Math.min(1, cue.pan.x * 0.4 + (cue.pan.x >= 0 ? 1 : -1) * sweep * (e - 0.5)));
+      }
+      dx = vx - ox - px * ox;
       dy = vy - oy - py * oy;
     }
     if (cue.fx.shake) {

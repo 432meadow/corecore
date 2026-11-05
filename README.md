@@ -113,11 +113,14 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   (long takes only).
 - **Cinematic treatment**: every cycle picks a colour grade (cold, night, bleach, mono, warm, neutral:
   filter, lifted blacks, tint, highlight bloom), speed ramps slow motion-heavy shots down and catch up
-  before the cut, a voice keeps talking under the next shot (L-cut), phone footage is shown whole over a
-  soft dark copy of itself instead of cropped, bursts occasionally stutter a moment two or three times,
-  and rare textures (low-res re-upload, chromatic aberration) mark the material as something that
-  travelled through the internet. Title cards on black use the sources' own titles. Frames: 16:9, 2.39:1
-  scope, 9:16, 1:1.
+  before the cut, a voice keeps talking under the next shot (L-cut), bursts occasionally stutter a moment
+  two or three times, and rare textures (low-res re-upload, chromatic aberration) mark the material as
+  something that travelled through the internet. Title cards on black use the sources' own titles.
+  Frames: 16:9, 2.39:1 scope, 9:16, 1:1. Clips fill the frame edge to edge, cropped, never letterboxed
+  into a band: in 9:16 every clip (a wide one keeps near its middle and drifts slowly across during the
+  shot, a tenth of the frame a second, so what it holds passes through), in 16:9 and 1:1 a phone clip
+  (keeping its upper middle, where faces are). Only the 2.39:1 frame shows phone footage whole, over a
+  soft dark copy of itself, since a fill there would keep a quarter of its height.
 - **Found text**: captions are drawn half the time from the source's own title ("a date with your
   family", "design for dreaming"), the rest from a small built-in pool or your own lines.
 - **Faces**: with `opencv-python-headless<5` installed, clips get a `faces` tag from a Haar cascade run
