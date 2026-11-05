@@ -125,8 +125,7 @@ function setTheme(t) {   // 'dark' | 'light' | 'system'
   else document.documentElement.dataset.theme = t;
   try { localStorage.setItem('corecore.theme', t); } catch (e) { /* private mode */ }
   for (const [id, v] of [['#tDark', 'dark'], ['#tLight', 'light'], ['#tSys', 'system']]) flip($(id), v === t);
-  const dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-  $('meta[name="theme-color"]').content = dark ? '#121212' : '#fafafa';
+  // theme-color in the head stays #121212 in both themes, as the look has it
 }
 
 function syncUrl() {
@@ -380,7 +379,6 @@ function wire() {
   let theme = 'system';
   try { theme = localStorage.getItem('corecore.theme') || 'system'; } catch (e) { /* ignore */ }
   setTheme(['dark', 'light', 'system'].includes(theme) ? theme : 'system');
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!document.documentElement.dataset.theme) setTheme('system'); });
   $('#tDark').addEventListener('click', () => setTheme('dark'));
   $('#tLight').addEventListener('click', () => setTheme('light'));
   $('#tSys').addEventListener('click', () => setTheme('system'));
