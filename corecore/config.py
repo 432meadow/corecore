@@ -69,6 +69,10 @@ _DEFAULT_BLOCKLIST = [
     "podcast", "interview", "explained", "lecture", "tutorial", "how to", "review", "reviews", "unboxing",
     "product", "haul", "sponsored", "giveaway", "satisfyer", "trailer", "featurette", "recap", "recaps",
     "bloopers", "reaction", "reacts",
+    # and what the second beauty scrape let through: memes and sketches, 3D renders and cosplay, crash
+    # investigations, air shows of the military, political posts, animal mating
+    "meme", "memes", "comedy", "cosplay", "3d", "noob", "black box", "raf", "air force", "navy", "c17", "c-17",
+    "fighter jet", "djt", "thehill", "coitus",
 ]
 _env_block = os.environ.get("CORECORE_BLOCKLIST", "")
 BLOCKLIST: list[str] = [] if _env_block.strip().lower() == "off" else (
@@ -76,7 +80,7 @@ BLOCKLIST: list[str] = [] if _env_block.strip().lower() == "off" else (
 
 # Accounts whose posts are campaigns, lobbying or activism rather than footage of the world; matched against
 # the uploader name, case-insensitively. Extend with CORECORE_BLOCKED_UPLOADERS="name,name"; "off" disables.
-_DEFAULT_BLOCKED_UPLOADERS = ["officialpeta", "israelinusa", "aipac", "btselem", "govchristie"]
+_DEFAULT_BLOCKED_UPLOADERS = ["officialpeta", "israelinusa", "aipac", "btselem", "govchristie", "roosterteeth"]
 _env_up = os.environ.get("CORECORE_BLOCKED_UPLOADERS", "")
 BLOCKED_UPLOADERS: set[str] = set() if _env_up.strip().lower() == "off" else (
     set(_DEFAULT_BLOCKED_UPLOADERS) | {u.strip().lower() for u in _env_up.split(",") if u.strip()})

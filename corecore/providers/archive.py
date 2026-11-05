@@ -81,6 +81,16 @@ def choose_file(files: list[dict], prefer_small: bool | None = None) -> dict | N
     return best
 
 
+def _search_page(q: str, sort: str, rows: int, page: int) -> dict:
+    params = [("q", q), ("rows", str(rows)), ("page", str(page)), ("output", "json"), ("sort[]", sort)]
+    for fl in ("identifier", "title", "creator", "licenseurl", "runtime"):
+        params.append(("fl[]", fl))
+    data = _get_json(SEARCH_URL + "?" + urllib.parse.urlencode(params))
+    if "error" in data or "response" not in data:  # advancedsearch answers bad queries with HTTP 200 + {"error": ...}
+        raise ProviderError(f"archive search error: {data.get('error', data)}")
+    return data
+
+
 class ArchiveProvider(Provider):
     name = "archive"
 
@@ -102,15 +112,18 @@ class ArchiveProvider(Provider):
             query, _, sort = query.partition("|sort=")
             query, sort = query.strip(), sort.strip() or "downloads desc"
         q = query if "mediatype:" in query else f"({query}) AND mediatype:movies"
-        page = os.environ.get("CORECORE_ARCHIVE_PAGE", "1")  # rotate pages across scheduled builds for fresh material
-        params = [("q", q), ("rows", str(max(1, max_items * 3))), ("page", page if page.isdigit() else "1"),
-                  ("output", "json"), ("sort[]", sort)]
-        for fl in ("identifier", "title", "creator", "licenseurl", "runtime"):
-            params.append(("fl[]", fl))
-        data = _get_json(SEARCH_URL + "?" + urllib.parse.urlencode(params))
-        if "error" in data or "response" not in data:  # advancedsearch answers bad queries with HTTP 200 + {"error": ...}
-            raise ProviderError(f"archive search error: {data.get('error', data)}")
+        rows = max(1, max_items * 3)
+        env_page = os.environ.get("CORECORE_ARCHIVE_PAGE", "1")  # rotate pages across scheduled builds for fresh material
+        page = int(env_page) if env_page.isdigit() and int(env_page) > 0 else 1
+        data = _search_page(q, sort, rows, page)
         docs = data.get("response", {}).get("docs", [])
+        found = int(data.get("response", {}).get("numFound") or 0)
+        if not docs and page > 1 and found > 0:
+            # the rotation ran past the end of a small result set (41 trail-cam videos have no page 3):
+            # wrap around to a page that exists, so small, clean queries still contribute every week
+            page = (page - 1) % -(-found // rows) + 1
+            data = _search_page(q, sort, rows, page)
+            docs = data.get("response", {}).get("docs", [])
         cands = []
         for d in docs:
             dur = _runtime_seconds(d.get("runtime"))

@@ -106,7 +106,8 @@ CONTEMPORARY_JOBS = [
     # Title words on the mirror found games, manga dubs and news ("fox" gave Star Fox, "paid for" gave campaign
     # news, "blossom" gave product reviews), so these go to corners of the archive where the footage is what
     # it says: the park service's own camera work (public domain), Flickr's wildlife clips (CC BY), nature
-    # centres' trail cameras, nest cams, a bear cam. The mirrors are kept to phrases junk rarely carries.
+    # centres' trail cameras, nest cams, a bear cam. The mirrors are kept to phrases junk rarely carries; the
+    # short-form mirrors were dropped here, since half of what their wildlife hashtags found was sketches.
     {"provider": "archive", "query": 'identifier:nps-video-* AND creator:("Neal Herbert") AND NOT title:(what OR how OR why OR does OR has OR should OR when OR will OR program OR crowd OR "pre-show" OR fight OR visiting OR managing OR collaring OR "in depth" OR inside OR short OR vendors OR interview OR challenges OR kill OR carcass OR plowing OR webinar OR talk OR musical OR rumor OR equipment OR chase OR discusses OR ranger OR jams) |sort=downloads desc',
      "max_items": 12, "tags": ["nature", "animals", "light", "quiet", "beauty", "modern"]},
     {"provider": "archive", "query": 'identifier:Flickr-* AND mediatype:movies AND title:(deer OR fawn OR fox OR owl OR owlet OR owlets OR heron OR egret OR squirrel OR raccoon OR hummingbird OR chickadee OR nuthatch OR woodpecker OR bluebird OR cardinal OR hedgehog OR badger OR "bird feeder" OR "bird bath" OR "trail camera" OR "game camera" OR "baby birds" OR "backyard birds" OR nestlings OR fledgling OR fledglings OR ducklings OR goslings OR "bird nest" OR "on the nest") AND NOT title:("owl city" OR albatross OR attacks OR prey OR preying OR shredding OR rat OR raid OR injured OR biologists OR "photo credit") |sort=downloads desc',
@@ -119,14 +120,14 @@ CONTEMPORARY_JOBS = [
      "max_items": 6, "tags": ["trailcam", "nature", "animals", "beauty", "modern"]},
     {"provider": "archive", "query": _MT + 'title:("street piano" OR "public piano" OR busker OR "street musician") AND NOT title:(tutorial OR lesson OR cover OR karaoke)' + _NEW,
      "max_items": 5, "tags": ["kind", "crowd", "voice", "beauty", "modern"]},
+    {"provider": "archive", "query": 'identifier:Flickr-* AND mediatype:movies AND creator:(USFWS OR "Fish and Wildlife" OR "National Park" OR "Bureau of Land Management") AND NOT title:(drone OR training OR burn OR burning OR fire OR wildfire OR "leave no trace" OR "off-highway" OR ohv OR psa OR meeting OR webinar OR interview OR talk OR ceremony OR press OR announcement OR "how to" OR safety OR hunting OR hunt OR "public lands day" OR volunteers OR video) |sort=downloads desc',
+     "max_items": 10, "tags": ["nature", "animals", "quiet", "beauty", "modern"]},
     {"provider": "archive", "query": 'identifier:Flickr-* AND mediatype:movies AND title:(sunrise OR sunset OR "golden hour" OR fog OR mist OR snowfall OR "first snow" OR "falling snow" OR aurora OR "northern lights" OR "milky way" OR dusk OR dawn OR moonrise OR rainbow) AND NOT title:(party OR wedding OR concert OR festival OR drone OR timelapse OR time-lapse) |sort=downloads desc',
      "max_items": 10, "tags": ["light", "nature", "quiet", "beauty", "modern"]},
     {"provider": "archive", "query": 'identifier:Flickr-* AND mediatype:movies AND title:(waves OR surf OR creek OR brook OR stream OR waterfall OR "river" OR forest OR meadow OR "in the wind" OR "rain on" OR "cherry blossom" OR blossoms OR lavender OR "fall colors" OR "autumn leaves" OR "wheat field" OR fireflies) AND NOT title:(party OR wedding OR concert OR festival OR drone OR race OR boat OR jet) |sort=downloads desc',
      "max_items": 10, "tags": ["nature", "weather", "quiet", "beauty", "modern"]},
     {"provider": "archive", "query": 'identifier:Flickr-* AND mediatype:movies AND title:("my dog" OR "my cat" OR "our dog" OR "our cat" OR puppy OR puppies OR kitten OR kittens OR "first steps" OR "first snow" OR grandma OR grandpa OR grandmother OR grandfather OR "snow day" OR sledding OR playground OR bedtime OR "blowing bubbles") AND NOT title:(party OR wedding OR drone OR test) |sort=downloads desc',
      "max_items": 8, "tags": ["kind", "home", "childhood", "animals", "beauty", "modern"]},
-    {"provider": "archive", "query": 'identifier:tiktok-* AND title:(trailcam OR "trail cam" OR "bird feeder" OR "backyard birds" OR hummingbird OR "nara deer" OR "#wildlife" OR "#nature" OR "#deer") AND NOT title:(sonic OR logo OR impersonation OR hunting OR humor OR partner OR shoes OR boomer OR peed OR amazon OR plush OR modeling OR influencers OR peeve OR fishing OR duck OR "be like" OR rv)' + _NEW,
-     "max_items": 6, "tags": ["trailcam", "nature", "animals", "beauty", "modern", "phone"]},
     # More of the mundane and the strange: transit, weather, liminal places, work, animals, rituals, crowds.
     {"provider": "archive", "query": _MT + 'title:(train OR subway OR metro OR tram) AND title:(ride OR pov OR window OR "cab view")' + _NEW,
      "max_items": 5, "tags": ["traffic", "city", "modern", "transit"]},

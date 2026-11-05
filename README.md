@@ -151,13 +151,17 @@ middle dots. There are no toasts, spinners or sounds from the interface.
 
 ## Sources
 
-Two starter sets, one switch (`--set contemporary|archival|all`, or the two buttons in the controls):
+Three starter sets, one switch (`--set contemporary|beauty|archival|all`, or the buttons in the controls):
 
 - **beauty** (also inside the contemporary set, early in the list): kindness and subtle natural
-  poignance. Trail cams and wildlife cameras, golden hour and first snow and blossom, aurora, waves and
-  forest walks, slow television, reunions, animals greeting people, grandparents cooking and dancing,
-  street musicians, gardens and bees, kids playing. Tagged `beauty`, `kind`, `light`, `trailcam`, so the
-  sequencer can cut kindness against traffic and beauty against screens; `hopecore` prefers them.
+  poignance, from corners of the archive where the footage is what its title says. The park service's
+  own camera work in Yellowstone and Arches (wolves, bison in snow, morning fog, a sunrise), Flickr's
+  wildlife, light, water and home clips (herons, owls, fledglings, sunsets, fog, waves, rain on a window,
+  sledding, first snow), the wildlife and land agencies' rivers and creatures, nature centres' trail
+  cameras, nest boxes and osprey cams, the Brooks Falls bear cam, public pianos. Title searches on the
+  YouTube mirror were tried first and found games, manga dubs and news for innocent words, so they are
+  gone from this set. Tagged `beauty`, `kind`, `light`, `trailcam`, so the sequencer can cut kindness
+  against traffic and beauty against screens; `hopecore` prefers them.
 - **contemporary** (the default): internet-native material. The Internet Archive's `mirrortube` collection
   holds about two million YouTube videos that people archived, 920k of them from 2022 on, with H.264 files:
   dashcams, vlogs, walking tours, driving POVs, doorbell and CCTV clips, game moments, pets, raw footage,
@@ -218,7 +222,7 @@ Environment variables, all optional:
 | `CORECORE_NO_WORKER` | unset | `1` disables the in-process worker (run `python -m corecore worker` elsewhere) |
 | `CORECORE_ARCHIVE_PREFER_SMALL` | 0 | `1` prefers the 512 kb/s Internet Archive derivative (faster builds) |
 | `CORECORE_ARCHIVE_PAGE` | 1 | which page of Internet Archive results to take (CI rotates it weekly) |
-| `CORECORE_BLOCKLIST` | built-in list | extra comma-separated title words to drop; `off` disables the filter. The built-in list covers adult material, violence and war, and off-topic material a title search keeps finding by accident: anime and manga dubs, cartoons, news and politics, punditry, product reviews, trailers |
+| `CORECORE_BLOCKLIST` | built-in list | extra comma-separated title words to drop; `off` disables the filter. The built-in list covers adult material, violence and war, and off-topic material a title search keeps finding by accident: anime and manga dubs, cartoons, news and politics, punditry, product reviews, trailers, memes and sketches, 3D renders and cosplay |
 | `CORECORE_BLOCKED_UPLOADERS` | a short built-in list | extra comma-separated uploader names to drop (accounts that post campaigns, lobbying or activism rather than footage of the world); `off` disables it. A blocklist word in an uploader name, such as "news", also drops the source |
 | `CORECORE_LOCAL_ROOTS` | `media/inbox` | extra directories the local provider may read over the API (path-separator separated) |
 | `CORECORE_STREAM_SECONDS` | 90 | how much of a live stream the `stream` provider records per job |

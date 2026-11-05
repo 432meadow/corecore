@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import tempfile
+import urllib.parse
 import unittest
 from pathlib import Path
 
@@ -310,6 +311,36 @@ class ContemporaryTest(unittest.TestCase):
         self.assertTrue(config.blocked_source("We grilled a dog outside a BBQ spot", "officialpeta"))
         self.assertFalse(config.blocked_source("We grilled a dog outside a BBQ spot", "a neighbour"))
         self.assertFalse(config.blocked_source("Snow on the allotment", None))
+        # what the second beauty scrape let through, and what it should keep
+        for junk in ("sunset flower meme 21 Jan 2020", "Majestic sunset c17 take-off RAF Lakenheath",
+                     "Black Box Recorders recovered from Sunset Limited Engines", "No snow day #comedy #shorts",
+                     "#silent #fox #cute #play #3d", "20161127 - 172238 - Badger - Attempted coitus - 0177"):
+            self.assertTrue(config.blocked_title(junk), junk)
+        self.assertTrue(config.blocked_source("MY BULLY ADOPTED ME", "cute noob"))
+        for fine in ("Bison in Snow (pair) (Yellowstone National Park, NPS video)", "Dogs in Fog", "Waves rolling in",
+                     "Hummingbird Making Nest", "Minute Out In It: Morning Fog (Yellowstone National Park, NPS video)",
+                     "Kelp Forest SlowMix, Monterey Bay Aquarium, California"):
+            self.assertFalse(config.blocked_title(fine), fine)
+
+    def test_archive_page_wraps_for_small_result_sets(self):
+        # the build rotates the results page weekly; a query with 41 results has no page 3, so it wraps to page 1
+        from corecore.providers import archive
+        calls = []
+        def fake(url):
+            q = dict(urllib.parse.parse_qsl(url.split("?", 1)[1]))
+            calls.append(int(q["page"]))
+            docs = [] if int(q["page"]) > 2 else [{"identifier": f"cam-{q['page']}-{i}", "title": f"Trail camera {i}"} for i in range(3)]
+            return {"response": {"numFound": 41, "docs": docs}}
+        old_get, old_env = archive._get_json, os.environ.get("CORECORE_ARCHIVE_PAGE")
+        archive._get_json, os.environ["CORECORE_ARCHIVE_PAGE"] = fake, "3"
+        try:
+            cands = archive.ArchiveProvider().search('title:("trail cam")', None, 8)
+        finally:
+            archive._get_json = old_get
+            if old_env is None: os.environ.pop("CORECORE_ARCHIVE_PAGE", None)
+            else: os.environ["CORECORE_ARCHIVE_PAGE"] = old_env
+        self.assertEqual(calls, [3, 1])            # 41 results in pages of 24: page 3 wraps to page 1
+        self.assertEqual([c.external_id for c in cands], ["cam-1-0", "cam-1-1", "cam-1-2"])
         for ok in ("a warm day in Essex", "software demo at the fair", "award show vlog", "stripes on my cat", "sex pistols cover"):
             self.assertEqual(config.blocked_title(ok), ok.startswith("sex"), ok)   # whole words only
 
