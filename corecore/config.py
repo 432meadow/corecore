@@ -73,6 +73,10 @@ _DEFAULT_BLOCKLIST = [
     # investigations, air shows of the military, political posts, animal mating
     "meme", "memes", "comedy", "cosplay", "3d", "noob", "black box", "raf", "air force", "navy", "c17", "c-17",
     "fighter jet", "djt", "thehill", "coitus",
+    # violence, against animals or people, and the politics that came with the caught-on-camera clips
+    "violence", "violent", "brutal", "beaten", "beating", "beat up", "beats up", "beat him", "stomp", "stomps",
+    "stomped", "stomping", "punch", "punched", "punches", "punching", "slap", "slapped", "slaps", "rioters",
+    "died suddenly", "republican", "republicans", "democrat", "democrats", "j6",
 ]
 _env_block = os.environ.get("CORECORE_BLOCKLIST", "")
 BLOCKLIST: list[str] = [] if _env_block.strip().lower() == "off" else (
@@ -91,14 +95,37 @@ HARD_BLOCKLIST: list[str] = [
     "concentration camp", "death camp", "mussolini", "fascist", "fascists", "fascism", "ww2", "wwii", "ww ii",
     "world war 2", "world war ii", "second world war", "ww1", "wwi", "world war 1", "world war i", "first world war",
     "blitz", "blitzkrieg", "d-day", "propaganda",
+    # and cruelty, to animals above all: never in the piece, whatever the title says
+    "animal abuse", "animal cruelty", "cruelty", "abuse", "abused", "abusing", "abuser", "brutality", "brutalized",
+    "torture", "tortured", "torturing", "maltreatment", "mistreated", "mistreatment", "beaten to death",
+    "beat him to death", "beat her to death",
 ]
 
 # Accounts whose posts are campaigns, lobbying or activism rather than footage of the world; matched against
 # the uploader name, case-insensitively. Extend with CORECORE_BLOCKED_UPLOADERS="name,name"; "off" disables.
-_DEFAULT_BLOCKED_UPLOADERS = ["officialpeta", "israelinusa", "aipac", "btselem", "govchristie", "roosterteeth"]
+_DEFAULT_BLOCKED_UPLOADERS = [
+    "officialpeta", "israelinusa", "aipac", "btselem", "govchristie", "roosterteeth",
+    # accounts behind the caught-on-camera clips: an animal kicked in the street, a man beaten to death,
+    # "died suddenly" deaths, campaign and partisan posts, true crime, tabloids
+    "ray garcia", "diedsuddenly", "the lincoln project", "theblaze", "newsmax", "heartland signal", "andy ngô",
+    "andy ngo", "disclose tv", "t greg doucette", "the sun", "investigation discovery", "the intercept",
+]
+
+
+def _norm_uploader(name: str | None) -> str:
+    """An uploader name as letters and digits only, so that "Ray Garcia 🇺🇸" matches "ray garcia"."""
+    return " ".join("".join(ch if ch.isalnum() else " " for ch in (name or "").lower()).split())
+
+
 _env_up = os.environ.get("CORECORE_BLOCKED_UPLOADERS", "")
 BLOCKED_UPLOADERS: set[str] = set() if _env_up.strip().lower() == "off" else (
-    set(_DEFAULT_BLOCKED_UPLOADERS) | {u.strip().lower() for u in _env_up.split(",") if u.strip()})
+    {_norm_uploader(u) for u in _DEFAULT_BLOCKED_UPLOADERS} | {_norm_uploader(u) for u in _env_up.split(",") if u.strip()})
+
+# Sources removed by hand after someone saw them, as "provider:external_id": the audit bans their clips and
+# deletes the files, and the archive search never offers them again.
+BANNED_SOURCES: set[str] = {
+    "archive:twitter-1295991588083163136",   # a raccoon kicked in the street at night
+}
 
 
 _BLOCK_RE = re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(w) for w in BLOCKLIST) + r")(?![a-z0-9])") if BLOCKLIST else None
@@ -123,8 +150,8 @@ def blocked_title(title: str | None) -> bool:
 def blocked_source(title: str | None, uploader: str | None = None) -> bool:
     """A source is dropped when its title carries a blocked word, when its uploader name does (a channel called
     "... News"), or when the uploader is on the blocked-accounts list."""
-    up = (uploader or "").strip().lower()
-    return blocked_title(title) or (bool(up) and (up in BLOCKED_UPLOADERS or blocked_title(up)))
+    up = _norm_uploader(uploader)
+    return blocked_title(title) or (bool(up) and (up in BLOCKED_UPLOADERS or blocked_title(uploader)))
 
 
 def ensure_dirs() -> None:

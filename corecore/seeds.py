@@ -73,8 +73,6 @@ CONTEMPORARY_JOBS = [
      "max_items": 8, "tags": ["city", "vlog", "modern", "phone"]},
     {"provider": "archive", "query": "identifier:instagram-*" + _NEW, "max_items": 10,
      "tags": ["reels", "modern", "phone"]},
-    {"provider": "archive", "query": "identifier:twitter-* AND title:(dashcam OR cctv OR \"caught on\" OR doorbell)" + _NEW,
-     "max_items": 8, "tags": ["cctv", "modern"]},
     {"provider": "archive", "query": _MT + 'title:("dash cam" OR dashcam)' + _NEW, "max_items": 6,
      "tags": ["dashcam", "traffic", "modern"]},
     {"provider": "archive", "query": _MT + 'title:(dashcam OR "dash cam") AND title:(russia OR russian OR winter OR snow OR compilation)' + _NEW,
@@ -172,6 +170,14 @@ CONTEMPORARY_JOBS = [
     # Dailymotion search (public API); downloads need yt-dlp's impersonation extra, see README
     {"provider": "dailymotion", "query": "russian dashcam compilation", "max_items": 3, "tags": ["dashcam", "traffic", "modern"]},
     {"provider": "dailymotion", "query": "caught on dashcam", "max_items": 3, "tags": ["dashcam", "traffic", "modern"]},
+]
+
+# Queries taken out of the sets because of what they brought in. The audit removes every source they ever
+# ingested from the pool, files and all.
+RETIRED_QUERIES = [
+    # caught-on-camera tweets: an animal kicked in the street, a man beaten to death, deaths, a plane crash,
+    # riots, partisan posts; the mirrortube dashcam queries cover the dashcams
+    "identifier:twitter-* AND title:(dashcam OR cctv OR \"caught on\" OR doorbell)" + _NEW,
 ]
 
 BEAUTY_JOBS = [j for j in CONTEMPORARY_JOBS if "beauty" in j["tags"]]

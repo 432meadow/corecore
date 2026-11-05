@@ -152,6 +152,8 @@ class ArchiveProvider(Provider):
                 continue
             if config.hard_blocked(_text(d.get("description")) + " " + _text(d.get("subject"))):
                 continue
+            if f"archive:{ident}" in config.BANNED_SOURCES:
+                continue
             cands.append(Candidate("archive", ident, f"https://archive.org/details/{ident}",
                                    title=str(_first(d.get("title")) or ident), uploader=str(_first(d.get("creator")) or ""),
                                    duration=dur, license=str(_first(d.get("licenseurl")) or "")))

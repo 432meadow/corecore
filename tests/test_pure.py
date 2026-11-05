@@ -132,17 +132,26 @@ class HardBlockTest(unittest.TestCase):
             self.assertTrue(config.blocked_title(t), t)
         for t in ("Bison in Snow (pair)", "a warm day in Essex", "world wide web explained badly", "Fox Sparrow"):
             self.assertFalse(config.hard_blocked(t), t)
+        # cruelty is never in the piece; uploader names match without their emoji
+        self.assertTrue(config.hard_blocked("BLM animal (brutality) caught on camera"))
+        self.assertTrue(config.hard_blocked("a description: the dog was abused for years"))
+        self.assertTrue(config.blocked_source("Anything at all", "Ray Garcia \U0001F1FA\U0001F1F8"))
+        self.assertTrue(config.blocked_title("Except dog crap. And violence. And Champ."))
+        self.assertFalse(config.blocked_source("Kitten Wrasslin' on the bed", "Nina Paley"))
 
     def test_audit_removes_hitler_footage_from_the_pool(self):
-        from corecore import audit as audit_mod
+        from corecore import audit as audit_mod, seeds
         with db.connect() as conn:
             conn.execute("DELETE FROM sources")
             for ext, title, uploader, provider in (("speech", "Hitler's speech at Siemens Dynamo factory", "Blitz", "archive"),
                                                    ("compilation", "The 20th century in ten minutes", "a history channel", "archive"),
                                                    ("heron", "Great Blue Heron Flying", "Katja Schulz", "archive"),
-                                                   ("walk", "Night walk in the rain", "someone", "ytdlp")):
-                conn.execute("INSERT INTO sources (provider, external_id, url, title, uploader, status, tags) "
-                             "VALUES (?, ?, 'u', ?, ?, 'done', ',modern,')", (provider, ext, title, uploader))
+                                                   ("walk", "Night walk in the rain", "someone", "ytdlp"),
+                                                   ("twitter-1295991588083163136", "a clip", "someone", "archive"),
+                                                   ("retired", "a doorbell clip", "someone", "archive")):
+                query = seeds.RETIRED_QUERIES[0] if ext == "retired" else "q"
+                conn.execute("INSERT INTO sources (provider, external_id, url, title, uploader, status, tags, query) "
+                             "VALUES (?, ?, 'u', ?, ?, 'done', ',modern,', ?)", (provider, ext, title, uploader, query))
                 sid = conn.execute("SELECT id FROM sources WHERE external_id = ?", (ext,)).fetchone()["id"]
                 (config.SEGMENTS_DIR / f"{ext}.mp4").write_bytes(b"x")
                 (config.THUMBS_DIR / f"{ext}.jpg").write_bytes(b"x")
@@ -157,12 +166,12 @@ class HardBlockTest(unittest.TestCase):
             return {"description": "a heron over the marsh", "subject": ["birds"]}
 
         r = audit_mod.audit(fetch=fetch, workers=2, log=lambda m: None)
-        self.assertEqual((r["sources_removed"], r["clips_removed"]), (2, 2))
+        self.assertEqual((r["sources_removed"], r["clips_removed"]), (4, 4))   # by title, by description, by hand, by query
         self.assertEqual(sorted(lookups), ["compilation", "heron"])   # the speech fell on its title; the yt-dlp walk has nothing to look up
         with db.connect() as conn:
             banned = {row["external_id"]: row["banned"] for row in
                       conn.execute("SELECT s.external_id, c.banned FROM clips c JOIN sources s ON s.id = c.source_id")}
-        self.assertEqual(banned, {"speech": 1, "compilation": 1, "heron": 0, "walk": 0})
+        self.assertEqual(banned, {"speech": 1, "compilation": 1, "heron": 0, "walk": 0, "twitter-1295991588083163136": 1, "retired": 1})
         self.assertFalse((config.SEGMENTS_DIR / "speech.mp4").exists())
         self.assertFalse((config.THUMBS_DIR / "compilation.jpg").exists())
         self.assertTrue((config.SEGMENTS_DIR / "heron.mp4").exists())

@@ -1,7 +1,8 @@
 """Removes footage the piece must never show from the pool itself: every clip of a source whose title or
-uploader, or (for Internet Archive items) description and subjects, name Hitler, the Nazis, fascism or the
-world wars (config.HARD_BLOCKLIST). Those clips are banned and their files deleted, so no later export can
-bring them back. Each archive item is looked up once; the flag is kept in sources.audited."""
+uploader, or (for Internet Archive items) description and subjects, name Hitler, the Nazis, fascism, the
+world wars or cruelty (config.HARD_BLOCKLIST); every source removed by hand (config.BANNED_SOURCES); and
+everything a retired query ever brought in (seeds.RETIRED_QUERIES). Those clips are banned and their files
+deleted, so no later export can bring them back. Each archive item is looked up once (sources.audited)."""
 
 from __future__ import annotations
 
@@ -27,14 +28,22 @@ def remove_source(conn, source_id: int, reason: str) -> int:
 
 def audit(fetch: Callable[[str], dict] | None = None, workers: int = 8, log: Callable[[str], None] = print) -> dict:
     from .providers.archive import fetch_metadata, hard_blocked_metadata
+    from .seeds import RETIRED_QUERIES
     fetch = fetch or fetch_metadata
+    retired = set(RETIRED_QUERIES)
     removed_sources = removed_clips = checked = unreachable = 0
     with db.connect() as conn:
-        rows = conn.execute("SELECT id, provider, external_id, title, uploader, audited FROM sources "
+        rows = conn.execute("SELECT id, provider, external_id, title, uploader, query, audited FROM sources "
                             "WHERE status != 'blocked'").fetchall()
         pending = []
-        for r in rows:  # titles and uploaders, every provider, no network
-            if config.hard_blocked(f"{r['title'] or ''} {r['uploader'] or ''}"):
+        for r in rows:  # by hand, by query, by title and uploader: every provider, no network
+            reason = ("removed by hand" if f"{r['provider']}:{r['external_id']}" in config.BANNED_SOURCES
+                      else "retired query" if (r["query"] or "") in retired else None)
+            if reason:
+                removed_clips += remove_source(conn, r["id"], reason)
+                removed_sources += 1
+                log(f"removed ({reason}): {r['title']} ({r['uploader'] or 'no uploader'})")
+            elif config.hard_blocked(f"{r['title'] or ''} {r['uploader'] or ''}"):
                 removed_clips += remove_source(conn, r["id"], "hard blocklist: title or uploader")
                 removed_sources += 1
                 log(f"removed: {r['title']} ({r['uploader'] or 'no uploader'})")
