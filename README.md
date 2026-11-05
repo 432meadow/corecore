@@ -121,8 +121,9 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   shot, a tenth of the frame a second, so what it holds passes through), in 16:9 and 1:1 a phone clip
   (keeping its upper middle, where faces are). Only the 2.39:1 frame shows phone footage whole, over a
   soft dark copy of itself, since a fill there would keep a quarter of its height.
-- **Found text**: captions are drawn half the time from the source's own title ("a date with your
-  family", "design for dreaming"), the rest from a small built-in pool or your own lines.
+- **Words**: for now the picture carries none of its own. The built-in caption lists at the top of
+  `web/sequencer.js` are empty while new ones are written, and the found titles (a source's own title used
+  as a caption, `useTitles` in each mode) are off; lines typed in the words box are still shown.
 - **Faces**: with `opencv-python-headless<5` installed, clips get a `faces` tag from a Haar cascade run
   on three frames, and the sequencer prefers them for motifs and climaxes.
 - **Live channel** (`?seed=live`, key `l`): the seed is derived from the clock in 10-minute windows and a

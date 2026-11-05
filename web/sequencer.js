@@ -4,27 +4,15 @@
 // a held image, a cut to black. Meaning comes from juxtaposition, so clips are chosen in contrasting pairs.
 import { makeRng } from './prng.js';
 
-export const CAPTIONS = [
-  "it's all so beautiful", 'we were here', 'look at us', 'are we ok', 'this is fine', 'what did we build',
-  'nothing is real', 'everything is real', 'do you remember', 'you are here', 'it will all be over soon',
-  'love is real', "i don't know", 'scroll', 'feel something', 'we are so lucky', 'what are we doing',
-  'it was always like this', 'look up', 'keep scrolling', 'i miss everything', "it's okay to feel it",
-  'the world is so big', 'we made this', 'someone filmed this', 'remember this',
+// The built-in captions, one list per kind of mode, are empty for now: the owner is writing their own. The
+// found titles are off too (useTitles in each mode), so until then the only words are those typed in the box.
+export const CAPTIONS = [       // corecore, chaos (nichetok), dwell
 ];
 
-// Lines for contemporary material: sincere, lowercase, no memes. The found titles do most of the talking.
-export const CAPTIONS_NOW = [
-  'someone filmed this', 'it was a tuesday', 'nothing happened today', 'we are all still here', 'this is the whole world',
-  'look at them', 'they do not know', 'it is still going', 'this was yesterday', 'somewhere right now', 'no one is watching',
-  'everyone is watching', 'i was there', 'you were there', 'it keeps going', 'this is real', 'all of this at once',
-  'the same day everywhere', 'it does not stop', 'we kept filming',
+export const CAPTIONS_NOW = [   // online (now)
 ];
 
-export const QUOTES = [
-  'you are allowed to begin again', 'the sun will rise and we will try again', 'look how far you have come',
-  'it is never too late', 'you have survived every single day so far', 'there is still time', 'be here',
-  'everything you love is alive right now', 'keep going', 'somebody is glad you exist', 'this is your life',
-  'nobody is coming, and that is okay', 'small things, every day', 'you were loved before you did anything',
+export const QUOTES = [         // hopecore
 ];
 
 // Tag pairs the sequencer uses to build meaning by collision. Falls back to pixel-derived tags
@@ -77,7 +65,7 @@ export const MODES = {
     black: { chance: 0.8, dur: [0.5, 1.8], silence: 0.3, text: 0.05 },
     fx: { grain: [0.07, 0.14], desat: 0.2, contrast: 1.08, letterbox: 0.15, bw: 0.04 },
     prefer: { brightness: -0.4 },
-    textStyle: 'caption', textPool: 'captions', useTitles: true,
+    textStyle: 'caption', textPool: 'captions', useTitles: false,
   },
   hopecore: {
     label: 'hopecore',
@@ -112,7 +100,7 @@ export const MODES = {
     black: { chance: 0.5, dur: [0.2, 0.6], silence: 0.5, text: 0.1 },
     fx: { grain: [0.1, 0.22], desat: 0.1, contrast: 1.15, letterbox: 0.3, bw: 0.1 },
     prefer: {},
-    textStyle: 'caption', textPool: 'captions', useTitles: true,
+    textStyle: 'caption', textPool: 'captions', useTitles: false,
   },
   dwell: {
     label: 'dwell',
@@ -128,7 +116,7 @@ export const MODES = {
     black: { chance: 0.6, dur: [1, 3], silence: 0.4, text: 0 },
     fx: { grain: [0.05, 0.1], desat: 0.3, contrast: 1.05, letterbox: 0.25, bw: 0.12 },
     prefer: { motion: -0.3 },
-    textStyle: 'caption', textPool: 'captions', useTitles: true,
+    textStyle: 'caption', textPool: 'captions', useTitles: false,
     texture: { pixelate: 0, aberration: 0 }, stutter: 0, ramp: { dwell: 0.5, climax: 0.5, build: 0 },
     grades: { cold: 2, mono: 2, night: 2, neutral: 1 },
   },
@@ -148,7 +136,7 @@ export const MODES = {
     fx: { grain: [0.05, 0.1], desat: 0.1, contrast: 1.05, letterbox: 0.1, bw: 0.03 },
     ramp: { dwell: 0.55, climax: 0.6, build: 0.4 }, stutter: 0.2, texture: { pixelate: 0.06, aberration: 0.1 },
     grades: { cold: 3, night: 3, bleach: 1, mono: 1, warm: 1, neutral: 1 },
-    prefer: { brightness: -0.2 }, textStyle: 'caption', textPool: 'now', useTitles: true,
+    prefer: { brightness: -0.2 }, textStyle: 'caption', textPool: 'now', useTitles: false,
   },
 };
 
@@ -262,6 +250,7 @@ export class Sequencer {
     }
     const pools = { quotes: QUOTES, now: CAPTIONS_NOW, captions: CAPTIONS };
     const pool = custom || pools[this.params.textPool] || CAPTIONS;
+    if (!pool.length) return null;   // an empty list says nothing
     return { str: this.rng.pick(pool), style: st };
   }
 
