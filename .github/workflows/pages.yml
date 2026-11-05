@@ -59,7 +59,7 @@ jobs:
           if ! command -v ffmpeg > /dev/null; then
             for m in "" "http://archive.ubuntu.com/ubuntu/" "http://mirrors.edge.kernel.org/ubuntu/"; do
               try_mirror "$m" && break
-              echo "apt via ${m:-the runner's mirror} did not finish; trying another mirror"
+              echo "apt via ${m:-the default mirror} did not finish; trying another mirror"
             done
           fi
           ffmpeg -version | head -1
