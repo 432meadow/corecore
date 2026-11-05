@@ -69,7 +69,7 @@ providers (archive | ytdlp | local)
                                                         ▼
 browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js (8 preloaded <video>s, canvas compositor)
                                    ▲                             │
-                             audio.js: clip sound through a speaker, ducking, onsets, the desk, recording bus
+                             audio.js: clip sound through a speaker, the wash, onsets, the desk, recording bus
 ```
 
 - **Backend** (`corecore/`): FastAPI app, a SQLite job queue drained by one worker thread, three
@@ -79,15 +79,16 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   motif clips that come back, and durations/speeds/treatments from the current mode's parameters.
 - **Player** (`web/player.js`): cuts on the AudioContext clock, cover-fits clips with a slow push-in,
   adds grain, vignette, flashes, letterboxing, shake, double exposure, freeze frames and captions, and
-  lets the desk's clicks and keystrokes pull a cut forward.
+  lets the desk's mouse clicks pull a cut forward.
 - **The desk** (`web/desk.js`): the only sound there is. Instead of music, a room with a computer in it:
-  a PC fan with a blade tone that speeds up when the edit gets frantic, typing in words with spaces and
-  the odd backspace, mouse clicks and scroll-wheel ticks, the mouse sliding, a mug set down now and then,
-  a low room tone. Everything is synthesized from noise bursts and sine bodies. The desk is busy through
-  builds and bursts, still at the climax, and nearly silent after the cut to black; clicks and keys emit
-  onsets, so cuts can land on them. Each mode balances it its own way (`hopecore` has fewer keys and the
-  mug more often, `chaos` busy hands, `dwell` mostly the fan). There is no music menu: an earlier
-  generative ambient wash was taken out because it took away from the piece.
+  a PC fan with a blade tone that speeds up when the edit gets frantic, mouse clicks and scroll-wheel
+  ticks, the mouse sliding, a mug set down now and then, a low room tone; no keyboard. Everything is
+  synthesized from noise bursts and sine bodies. The desk is busy through builds and bursts, still at the
+  climax, and nearly silent after the cut to black; clicks emit onsets, so cuts can land on them. It is
+  never ducked: when the footage's own sound comes in, it plays over the desk. Each mode balances it its
+  own way (`hopecore` a lighter hand and the mug more often, `chaos` busy hands, `dwell` mostly the fan).
+  There is no music menu: an earlier generative ambient wash was taken out because it took away from the
+  piece.
 - **Frame and haze**: the picture sits inside the frame, smaller than it, its edges feathered into the
   page; the footage is softened with a slight gaussian blur and then grained, so it reads as something seen
   from a little way off. One fader drives all of it, and it loads at its fullest (`?edge=1`; 0 is full

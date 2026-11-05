@@ -66,10 +66,10 @@ export const MODES = {
   corecore: {
     label: 'corecore',
     blurb: 'slow, sad, then too fast. hard cuts, grain, cut to black.',
-    music: { level: 0.8, fan: 1, keys: 0.6, mouse: 0.7, mug: 0.8, room: 1 },        // the desk: a quiet evening at the computer
+    music: { level: 0.8, fan: 1, mouse: 0.7, mug: 0.8, room: 1 },        // the desk: a quiet evening at the computer
     cycle: ['dwell', 'jumpcut', 'juxtapose', 'build', 'burst', 'climax', 'black'],
     dwell: { clips: [1, 2], dur: [3, 6], speed: [0.6, 1.0], zoom: [1.03, 1.12], text: 0.06, fade: 0 },
-    voice: { chance: 0.3, dur: [4, 8], duck: 0.3 },
+    voice: { chance: 0.3, dur: [4, 8] },
     juxtapose: { chance: 0.7, pairs: [2, 4], dur: [0.7, 1.4] },
     build: { clips: [5, 9], durStart: [1.4, 2.0], durEnd: [0.4, 0.6], flash: 0.3, speed: [0.9, 1.3] },
     burst: { chance: 0.85, clips: [8, 18], dur: [0.16, 0.34], flashEnd: 0.5, shake: 0.5, speed: [1, 1.6], double: 0.1 },
@@ -82,10 +82,10 @@ export const MODES = {
   hopecore: {
     label: 'hopecore',
     blurb: 'same editing, warmer: light, quotes, no cut to black.',
-    music: { level: 0.75, fan: 0.9, keys: 0.4, mouse: 0.5, mug: 1, room: 1 },        // fewer keys, the mug set down more often
+    music: { level: 0.75, fan: 0.9, mouse: 0.5, mug: 1, room: 1 },        // a lighter hand, the mug set down more often
     cycle: ['dwell', 'juxtapose', 'build', 'burst', 'climax', 'dwell'],
     dwell: { clips: [1, 3], dur: [3.5, 6.5], speed: [0.7, 1.0], zoom: [1.03, 1.1], text: 0.3, fade: 0.3 },
-    voice: { chance: 0.2, dur: [4, 8], duck: 0.4 },
+    voice: { chance: 0.2, dur: [4, 8] },
     juxtapose: { chance: 0.5, pairs: [2, 3], dur: [0.9, 1.5] },
     build: { clips: [4, 7], durStart: [1.2, 1.8], durEnd: [0.5, 0.7], flash: 0.5, speed: [0.9, 1.2] },
     burst: { chance: 0.6, clips: [5, 9], dur: [0.3, 0.5], flashEnd: 0.6, shake: 0.1, speed: [1, 1.3], double: 0.05 },
@@ -100,11 +100,11 @@ export const MODES = {
   chaos: {
     label: 'chaos (nichetok)',
     blurb: 'the 2023 turn: nonsensical, layered, jarring speeds.',
-    music: { level: 0.85, fan: 1, keys: 1, mouse: 1, mug: 0.6, room: 0.8 },         // busy hands
+    music: { level: 0.85, fan: 1, mouse: 1, mug: 0.6, room: 0.8 },         // busy hands
     cycle: ['burst', 'juxtapose', 'build', 'jumpcut', 'burst', 'climax', 'black'],
     stutter: 0.4, texture: { pixelate: 0.15, aberration: 0.2 }, grades: { cold: 2, night: 2, bleach: 2, mono: 1, neutral: 1 },
     dwell: { clips: [1, 1], dur: [1.5, 3], speed: [0.4, 2.0], zoom: [1.0, 1.2], text: 0.1, fade: 0 },
-    voice: { chance: 0.35, dur: [1.5, 4], duck: 0.2 },
+    voice: { chance: 0.35, dur: [1.5, 4] },
     juxtapose: { chance: 0.6, pairs: [2, 5], dur: [0.4, 0.9] },
     build: { clips: [4, 8], durStart: [1.0, 1.4], durEnd: [0.25, 0.4], flash: 0.4, speed: [0.5, 2.0] },
     burst: { chance: 1, clips: [6, 14], dur: [0.2, 0.7], flashEnd: 0.4, shake: 0.6, speed: [0.5, 2.5], double: 0.35 },
@@ -117,10 +117,10 @@ export const MODES = {
   dwell: {
     label: 'dwell',
     blurb: 'long takes, slow push-ins, nothing happens.',
-    music: { level: 0.7, fan: 1, keys: 0.25, mouse: 0.35, mug: 0.7, room: 1 },       // mostly the fan
+    music: { level: 0.7, fan: 1, mouse: 0.35, mug: 0.7, room: 1 },       // mostly the fan
     cycle: ['dwell', 'dwell', 'black'],
     dwell: { clips: [1, 2], dur: [5, 10], speed: [0.5, 0.8], zoom: [1.04, 1.14], text: 0, fade: 0.6 },
-    voice: { chance: 0.15, dur: [6, 10], duck: 0.35 },
+    voice: { chance: 0.15, dur: [6, 10] },
     juxtapose: { chance: 0, pairs: [2, 2], dur: [1, 1] },
     build: { clips: [3, 4], durStart: [2, 3], durEnd: [1, 1.5], flash: 0, speed: [0.7, 1] },
     burst: { chance: 0, clips: [4, 4], dur: [0.5, 0.5], flashEnd: 0, shake: 0, speed: [1, 1], double: 0 },
@@ -135,10 +135,10 @@ export const MODES = {
   online: {
     label: 'online (now)',
     blurb: 'contemporary material, cinematic treatment: slow motion, jump cuts, sound bleeding across cuts.',
-    music: { level: 0.8, fan: 1, keys: 0.8, mouse: 0.8, mug: 0.9, room: 1 },        // the desk as it is
+    music: { level: 0.8, fan: 1, mouse: 0.8, mug: 0.9, room: 1 },        // the desk as it is
     cycle: ['dwell', 'jumpcut', 'juxtapose', 'build', 'burst', 'climax', 'black'],
     dwell: { clips: [1, 2], dur: [3, 6], speed: [0.5, 1.0], zoom: [1.02, 1.1], text: 0.05, fade: 0 },
-    voice: { chance: 0.4, dur: [3, 7], duck: 0.3 },
+    voice: { chance: 0.4, dur: [3, 7] },
     jumpcut: { chance: 0.6, pieces: [3, 5], dur: [0.6, 1.6], audio: true },
     juxtapose: { chance: 0.6, pairs: [2, 4], dur: [0.6, 1.3] },
     build: { clips: [5, 9], durStart: [1.3, 1.8], durEnd: [0.35, 0.55], flash: 0.2, speed: [1.0, 1.4] },
@@ -355,7 +355,7 @@ export class Sequencer {
     return cues;
   }
 
-  // A clip that gets to speak: interview, news, voice-over. Music ducks under it.
+  // A clip that gets to speak: interview, news, voice-over. The desk carries on under it, unducked.
   phrase_voice() {
     const v = this.params.voice;
     const clip = this.pickClip({ audio: true, tags: ['voice', 'interview', 'speech', 'news'], minDuration: 3 });
@@ -367,7 +367,7 @@ export class Sequencer {
       speed: 1,
       offset: 0,
       zoom: { from: 1.0, to: 1.06 },
-      audio: { clip: 1, duck: v.duck },
+      audio: { clip: 1, duck: 1 },
       audioTail: 0,
       fx: { vignette: 0.5, letterbox: this.letterbox() },
     })].map((c) => Object.assign(c, { phrase: 'voice' }));
@@ -394,7 +394,7 @@ export class Sequencer {
         offset,
         zoom: { from: 1 + 0.02 * i, to: 1 + 0.02 * i + 0.03 },
         fx: { letterbox: lb },
-        audio: { clip: withAudio ? 1 : 0, duck: withAudio ? this.params.voice.duck : 1 },
+        audio: { clip: withAudio ? 1 : 0, duck: 1 },
         audioTail: 0,
       }));
       offset += stride;
