@@ -321,6 +321,8 @@ INTERNET_JOBS = NEW_INTERNET_JOBS + [
 CONTEMPORARY_JOBS = CONTEMPORARY_JOBS + NEW_INTERNET_JOBS
 
 BEAUTY_JOBS = [j for j in CONTEMPORARY_JOBS if "beauty" in j["tags"]]
-SEED_SETS = {"contemporary": CONTEMPORARY_JOBS, "internet": INTERNET_JOBS, "beauty": BEAUTY_JOBS, "archival": ARCHIVAL_JOBS,
-             "all": CONTEMPORARY_JOBS + ARCHIVAL_JOBS}
+# the Twitter part (Periscope included), first in the owner's order, for runs that take more of its pages
+TWITTER_JOBS = [j for j in INTERNET_JOBS if "twitter-" in j["query"] or "periscope-" in j["query"]]
+SEED_SETS = {"contemporary": CONTEMPORARY_JOBS, "internet": INTERNET_JOBS, "twitter": TWITTER_JOBS, "beauty": BEAUTY_JOBS,
+             "archival": ARCHIVAL_JOBS, "all": CONTEMPORARY_JOBS + ARCHIVAL_JOBS}
 STARTER_JOBS = CONTEMPORARY_JOBS  # what `seed` and `build-site` use unless --set says otherwise

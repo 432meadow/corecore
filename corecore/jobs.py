@@ -155,6 +155,13 @@ def run_starter_jobs(time_budget: float, echo: Callable[[str], None] | None = No
     return summary
 
 
+def parse_pages(text: str | None) -> list[str | None]:
+    """'1,2,4' -> ['1', '2', '4']; nothing usable -> [None] (the page already in CORECORE_ARCHIVE_PAGE)."""
+    pages = [p.strip() for p in (text or "").replace(" ", ",").split(",")]
+    pages = [p for p in pages if p.isdigit() and int(p) > 0]
+    return list(dict.fromkeys(pages)) or [None]
+
+
 def run_reinstated(echo: Callable[[str], None] | None = None) -> dict:
     """Fetch again, by address, every source the owner put back (seeds.REINSTATED) that is not in the pool."""
     from . import seeds

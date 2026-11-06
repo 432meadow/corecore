@@ -490,9 +490,45 @@ class ContemporaryTest(unittest.TestCase):
             import importlib
             importlib.reload(archive)
 
+    def test_pages_for_a_deeper_run(self):
+        from corecore.jobs import parse_pages
+        self.assertEqual(parse_pages("1,2,4"), ["1", "2", "4"])
+        self.assertEqual(parse_pages(" 5 6,5 "), ["5", "6"])
+        self.assertEqual(parse_pages(""), [None])
+        self.assertEqual(parse_pages("0,x"), [None])
+        from corecore import seeds
+        self.assertTrue(seeds.TWITTER_JOBS and all(j in seeds.INTERNET_JOBS for j in seeds.TWITTER_JOBS))
+
+    def test_build_site_takes_each_page_in_turn(self):
+        import os
+        from unittest import mock
+        from corecore import __main__ as cli, audit as audit_mod, export as export_mod, jobs as jobs_mod
+        seen = []
+        def fake_run(budget, echo=None, seed_set="contemporary"):
+            seen.append((os.environ.get("CORECORE_ARCHIVE_PAGE"), seed_set, budget > 0))
+            return {"jobs": 0, "clips": 0}
+        saved = os.environ.get("CORECORE_ARCHIVE_PAGE")
+        try:
+            with mock.patch.object(jobs_mod, "run_starter_jobs", fake_run), \
+                 mock.patch.object(jobs_mod, "run_reinstated", lambda echo=None: {}), \
+                 mock.patch.object(audit_mod, "audit", lambda log=print: {}), \
+                 mock.patch.object(export_mod, "export_site", lambda *a, **k: {}):
+                with tempfile.TemporaryDirectory() as d:
+                    cli.main(["build-site", "--out", d, "--set", "twitter", "--time-budget", "60", "--pages", "1,2,4"])
+                    self.assertEqual(seen, [("1", "twitter", True), ("2", "twitter", True), ("4", "twitter", True)])
+                    seen.clear()
+                    os.environ["CORECORE_ARCHIVE_PAGE"] = "3"
+                    cli.main(["build-site", "--out", d, "--set", "internet", "--time-budget", "60"])
+                    self.assertEqual(seen, [("3", "internet", True)])   # no --pages: this week's page, as before
+        finally:
+            if saved is None:
+                os.environ.pop("CORECORE_ARCHIVE_PAGE", None)
+            else:
+                os.environ["CORECORE_ARCHIVE_PAGE"] = saved
+
     def test_seed_sets(self):
         from corecore import seeds
-        self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "internet", "beauty", "archival", "all"})
+        self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "internet", "twitter", "beauty", "archival", "all"})
         self.assertTrue(seeds.INTERNET_JOBS and all("modern" in j["tags"] and j["provider"] == "archive" for j in seeds.INTERNET_JOBS))
         self.assertTrue(all(j in seeds.CONTEMPORARY_JOBS for j in seeds.INTERNET_JOBS))   # weekly builds keep them in rotation
         self.assertTrue(all("beauty" in j["tags"] for j in seeds.BEAUTY_JOBS) and len(seeds.BEAUTY_JOBS) >= 10)

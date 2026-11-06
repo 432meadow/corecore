@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--tags", "-t", default="", help="comma-separated tags, e.g. nature,archive")
 
     p = sub.add_parser("seed", help="queue a starter set of scrape jobs")
-    p.add_argument("--set", default="contemporary", choices=["contemporary", "internet", "beauty", "archival", "all"], dest="seed_set")
+    p.add_argument("--set", default="contemporary", choices=["contemporary", "internet", "twitter", "beauty", "archival", "all"], dest="seed_set")
 
     p = sub.add_parser("export", help="write the player + a bounded slice of the pool as a static site")
     p.add_argument("--out", default="site")
@@ -41,11 +41,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max-mb", type=float, default=450, dest="max_mb")
     p.add_argument("--max-clips", type=int, default=2000, dest="max_clips")
     p.add_argument("--skip-ingest", action="store_true", dest="skip_ingest")
-    p.add_argument("--set", default="contemporary", choices=["contemporary", "internet", "beauty", "archival", "all"], dest="seed_set")
+    p.add_argument("--set", default="contemporary", choices=["contemporary", "internet", "twitter", "beauty", "archival", "all"], dest="seed_set")
     p.add_argument("--tags", default="", help="export only clips with at least one of these comma-separated tags")
     p.add_argument("--min-clips", type=int, default=0, dest="min_clips",
                    help="if the pool holds fewer clips than this, scrape for --fallback-budget seconds even when --time-budget is 0")
     p.add_argument("--fallback-budget", type=float, default=1200, dest="fallback_budget")
+    p.add_argument("--pages", default="", help="result pages to take in turn within the budget, e.g. 1,2,4 (each "
+                   "query takes the same number of items from each); default: the page in CORECORE_ARCHIVE_PAGE")
 
     p = sub.add_parser("audit", help="remove from the pool every source that names Hitler, the Nazis or the world wars")
     p.add_argument("--workers", type=int, default=8)
@@ -99,8 +101,18 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"pool holds {have} clips (< {args.min_clips}); scraping for {args.fallback_budget:.0f}s")
                 budget = args.fallback_budget
             if budget > 0:
-                summary = run_starter_jobs(budget, echo=lambda m: print(f"  {m}"), seed_set=args.seed_set)
-                print(f"ingest: {summary}")
+                import os
+                import time
+                from .jobs import parse_pages
+                deadline = time.monotonic() + budget
+                for page in parse_pages(args.pages):
+                    left = deadline - time.monotonic()
+                    if left <= 0:
+                        break
+                    if page:   # the archive provider reads its page from here at every search
+                        os.environ["CORECORE_ARCHIVE_PAGE"] = page
+                    summary = run_starter_jobs(left, echo=lambda m: print(f"  {m}"), seed_set=args.seed_set)
+                    print(f"ingest{f' (page {page})' if page else ''}: {summary}")
             else:
                 print(f"ingest skipped: pool holds {have} clips")
         if args.cmd == "build-site":
