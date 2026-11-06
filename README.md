@@ -5,7 +5,7 @@ Archive, anything yt-dlp can reach, or your own files), chops it into shots, and
 shots into an infinite stream: slow sad set-up, accelerating cuts, a burst of blisteringly fast ones, a
 held image, a cut to black. Over and over, never the same twice, reproducible by seed.
 
-**Watch it:** https://432meadow.github.io/corecore/ is the static edition, rebuilt weekly by CI from
+**Watch it:** https://clarity.peakambient.com/ is the static edition, rebuilt weekly by CI from
 contemporary web video mirrored on the Internet Archive (see Sources). Add `?seed=live` and you are on the live channel: everyone
 on that URL sees the same edit at the same moment.
 
