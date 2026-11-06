@@ -85,8 +85,11 @@ export class Player {
     this.snapEnabled = true;
     // the pre-roll: the next clip starts playing this long before its cut, unseen and silent, so at the cut it
     // is already moving. A phone takes a few hundred milliseconds to start a standing clip, longer where it
-    // fetches nothing ahead (iOS), so the lead grows to what this device has been seen to need.
-    this.prerollMin = matchMedia('(pointer: coarse)').matches ? 0.5 : 0.2;
+    // fetches nothing ahead (iOS), so the lead grows to what this device has been seen to need. Phones and
+    // tablets only, where clips stood still at their cuts: a computer starts clips from a standing frame at
+    // the cut as before (desktop Firefox played every clip choppily with it). setPreroll() overrides.
+    this.prerollOn = matchMedia('(pointer: coarse)').matches;
+    this.prerollMin = 0.5;
     this.preroll = this.prerollMin;
     this.startLag = 0;   // seconds a rolled clip has lately taken to start moving: the slowest at once, decaying
     this.rolled = null;  // the cue rolled last, watched until it moves
@@ -272,6 +275,10 @@ export class Player {
     }
   }
 
+  setPreroll(on) {
+    this.prerollOn = !!on;
+  }
+
   // One frame callback for each clip as it is prepared, and only one. In Safari a video the page cannot see decodes
   // no pictures until something asks, and a canvas draw that is the first to ask holds the whole page, up to a
   // second, until a picture comes: a freeze at each cut. A frame callback asks without waiting, so the clip's
@@ -415,15 +422,16 @@ export class Player {
         await waitEvent(el, 'loadedmetadata', 8000);
         if (abandoned()) { this.release(slot); cue.preparing = false; return; }
       }
-      this.watchFrames(slot);
+      if (this.prerollOn) this.watchFrames(slot);
       const rate = Math.max(0.1, Math.min(4, cue.ramp ? cue.ramp.from : cue.speed));
       el.defaultPlaybackRate = cue.speed;
       el.playbackRate = rate;
       // cued a little before its start, so that rolling from there for `lead` seconds brings it to the start;
-      // too near the head of the file to back up that far (a voice starts at 0), it creeps there instead
-      cue.lead = this.preroll;
-      cue.creep = cue.offset < this.preroll * rate ? CREEP : 0;
-      el.currentTime = Math.max(0, cue.offset - this.preroll * (cue.creep || rate));
+      // too near the head of the file to back up that far (a voice starts at 0), it creeps there instead.
+      // Without the pre-roll: cued on the frame itself, and started at the cut.
+      cue.lead = this.prerollOn ? this.preroll : 0;
+      cue.creep = cue.lead && cue.offset < cue.lead * rate ? CREEP : 0;
+      el.currentTime = Math.max(0, cue.offset - cue.lead * (cue.creep || rate));
       await waitSeek(el, 8000);
       if (abandoned()) { this.release(slot); cue.preparing = false; return; }
       cue.slot = slot;
@@ -628,7 +636,7 @@ export class Player {
   // streams): then it starts at the cut, as before.
   rollNext(now) {
     const c = this.current, n = this.queue[0];
-    if (!c || !n || n.kind !== 'clip' || !n.ready || n.rolling || !n.slot || n.dropped) return;
+    if (!c || !n || n.kind !== 'clip' || !n.ready || n.rolling || !n.slot || n.dropped || !n.lead) return;
     if (c.kind === 'black' && c.phrase === 'wait') return;
     if (now < c.end - (n.lead ?? this.preroll)) return;
     const el = n.slot.el;

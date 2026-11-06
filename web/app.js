@@ -46,6 +46,8 @@ const catalog = STATIC ? new StaticCatalog({ seed: seedToInt(state.seed), manife
 const sequencer = new Sequencer({ catalog, seed: state.seed, mode: state.mode });
 const canvas = $('#stage');
 const player = new Player({ canvas, audio, catalog, sequencer, videoHost: $('#videos') });
+// ?preroll=1 tries the pre-roll on a computer, ?preroll=0 turns it off on a phone (see the player)
+if (params.has('preroll')) player.setPreroll(params.get('preroll') !== '0');
 const recorder = new Recorder(canvas, audio);
 window.corecore = { audio, catalog, sequencer, player, recorder, state, MODES };
 
