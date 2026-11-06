@@ -43,7 +43,7 @@ export const GRADES = {
 const DEFAULTS = {
   ramp: { dwell: 0.3, climax: 0.4, build: 0.3 },        // chance of a speed ramp per phrase
   stutter: 0.12,                                       // chance a burst cut is repeated 2-3 times
-  texture: { pixelate: 0.03, aberration: 0.05 },       // low-res re-upload look, RGB split; rare by default
+  texture: { aberration: 0.05 },                       // RGB split; rare by default
   grades: { cold: 2, neutral: 2, warm: 1, bleach: 1, mono: 1, night: 1 },
   jumpcut: { chance: 0.25, pieces: [3, 4], dur: [0.7, 1.5], audio: true },
   fitVertical: 'blur',                                 // phone footage: blurred frame instead of a 60% crop
@@ -83,14 +83,14 @@ export const MODES = {
     prefer: { brightness: 0.5, saturation: 0.3 },
     preferTags: ['beauty', 'kind', 'light', 'trailcam'],
     textStyle: 'quote', textPool: 'quotes', useTitles: false,
-    texture: { pixelate: 0, aberration: 0 }, grades: { warm: 4, neutral: 2, bleach: 1 }, stutter: 0.05,
+    texture: { aberration: 0 }, grades: { warm: 4, neutral: 2, bleach: 1 }, stutter: 0.05,
   },
   chaos: {
     label: 'chaos (nichetok)',
     blurb: 'the 2023 turn: nonsensical, layered, jarring speeds.',
     music: { level: 0.85, fan: 1, mouse: 1, mug: 0.6, room: 0.8 },         // busy hands
     cycle: ['burst', 'juxtapose', 'build', 'jumpcut', 'burst', 'climax', 'black'],
-    stutter: 0.4, texture: { pixelate: 0.15, aberration: 0.2 }, grades: { cold: 2, night: 2, bleach: 2, mono: 1, neutral: 1 },
+    stutter: 0.4, texture: { aberration: 0.2 }, grades: { cold: 2, night: 2, bleach: 2, mono: 1, neutral: 1 },
     dwell: { clips: [1, 1], dur: [1.5, 3], speed: [0.4, 2.0], zoom: [1.0, 1.2], text: 0.1, fade: 0 },
     voice: { chance: 0.35, dur: [1.5, 4] },
     juxtapose: { chance: 0.6, pairs: [2, 5], dur: [0.4, 0.9] },
@@ -117,7 +117,7 @@ export const MODES = {
     fx: { grain: [0.05, 0.1], desat: 0.3, contrast: 1.05, letterbox: 0.25, bw: 0.12 },
     prefer: { motion: -0.3 },
     textStyle: 'caption', textPool: 'captions', useTitles: false,
-    texture: { pixelate: 0, aberration: 0 }, stutter: 0, ramp: { dwell: 0.5, climax: 0.5, build: 0 },
+    texture: { aberration: 0 }, stutter: 0, ramp: { dwell: 0.5, climax: 0.5, build: 0 },
     grades: { cold: 2, mono: 2, night: 2, neutral: 1 },
   },
   online: {
@@ -134,7 +134,7 @@ export const MODES = {
     climax: { dur: [2, 3.5], hold: 0.3, zoom: [1.0, 1.2], text: 0.08, motif: 0.6 },
     black: { chance: 0.75, dur: [0.5, 1.6], silence: 0.35, text: 0.15 },
     fx: { grain: [0.05, 0.1], desat: 0.1, contrast: 1.05, letterbox: 0.1, bw: 0.03 },
-    ramp: { dwell: 0.55, climax: 0.6, build: 0.4 }, stutter: 0.2, texture: { pixelate: 0.06, aberration: 0.1 },
+    ramp: { dwell: 0.55, climax: 0.6, build: 0.4 }, stutter: 0.2, texture: { aberration: 0.1 },
     grades: { cold: 3, night: 3, bleach: 1, mono: 1, warm: 1, neutral: 1 },
     prefer: { brightness: -0.2 }, textStyle: 'caption', textPool: 'now', useTitles: false,
   },
@@ -304,7 +304,6 @@ export class Sequencer {
         double: false,
         bw: this.rng.chance(fx.bw),
         hold: false,
-        pixelate: this.rng.chance(tex.pixelate) ? this.rng.int(3, 6) : 0,
         aberration: this.rng.chance(tex.aberration) ? this.rng.range(1.5, 4) : 0,
       }, opts.fx || {}),
       text: opts.text || null,

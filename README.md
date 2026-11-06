@@ -91,8 +91,8 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   piece.
 - **Frame and haze**: the picture sits inside the frame, smaller than it, its edges feathered into the
   page; the footage is softened with a slight gaussian blur and then grained, so it reads as something seen
-  from a little way off. One fader drives all of it: it loads at its fullest on a computer (`?edge=1`) and
-  at 0.40 on a phone, where the screen is small; 0 is full bleed, sharp and clean.
+  from a little way off. One fader drives all of it: it loads at 0.50 on a computer and at 0.40 on a phone,
+  where the screen is small; 1 is the fullest (`?edge=1`), 0 is full bleed, sharp and clean.
 - **The page**: by default the picture sits on an off-white page, like a print, with captions set in ink;
   a cut to black is then a cut to the page, the vignette stays inside the picture and a flash blows out the
   picture alone. `[ dark ]` in the controls puts it back on a black screen, `[ as the system has it ]`
@@ -114,8 +114,8 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 - **Cinematic treatment**: every cycle picks a colour grade (cold, night, bleach, mono, warm, neutral:
   filter, lifted blacks, tint, highlight bloom), speed ramps slow motion-heavy shots down and catch up
   before the cut, a voice keeps talking under the next shot (L-cut), bursts occasionally stutter a moment
-  two or three times, and rare textures (low-res re-upload, chromatic aberration) mark the material as
-  something that travelled through the internet. Title cards on black use the sources' own titles.
+  two or three times, and a rare chromatic aberration marks the material as something that travelled
+  through the internet. Title cards on black carry no words for now (see Words below).
   Frames: 16:9, 2.39:1 scope, 9:16, 1:1. Clips fill the frame edge to edge, cropped, never letterboxed
   into a band: in 9:16 every clip (a wide one keeps near its middle and drifts slowly across during the
   shot, a tenth of the frame a second, so what it holds passes through), in 16:9 and 1:1 a phone clip

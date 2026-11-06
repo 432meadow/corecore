@@ -24,7 +24,7 @@ const UPRIGHT = matchMedia('(orientation: portrait)');
 const defaultAspect = () => (PHONE && UPRIGHT.matches ? '9:16' : '16:9');
 // frame and haze on load: at its fullest on a computer (the small, soft picture); on a phone's small screen
 // the picture keeps more of itself, at 0.40
-const EDGE_DEFAULT = PHONE ? 0.4 : 1;
+const EDGE_DEFAULT = PHONE ? 0.4 : 0.5;
 const CLIPFX = { speaker: 'through computer speakers', phone: 'through a phone', direct: 'direct' };
 const PROVIDERS = { archive: 'internet archive', ytdlp: 'yt-dlp', dailymotion: 'dailymotion', reddit: 'reddit', stream: 'a stream', local: 'local files' };
 

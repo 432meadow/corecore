@@ -777,8 +777,8 @@ export class Player {
     else if (f.desat) filters.push(`saturate(${(1 - f.desat).toFixed(2)})`);
     if (f.contrast && f.contrast !== 1) filters.push(`contrast(${f.contrast})`);
     if (g.filter) filters.push(g.filter);
-    // the haze: a slight gaussian blur before the grain; not on the low-res texture, whose blocks are the point
-    if (this.edge > 0 && !(cue.fx.pixelate > 1)) filters.push(`blur(${(1.6 * this.edge).toFixed(2)}px)`);
+    // the haze: a slight gaussian blur before the grain
+    if (this.edge > 0) filters.push(`blur(${(1.6 * this.edge).toFixed(2)}px)`);
     const filterStr = this.filters ? filters.join(' ') : '';
     ctx.globalAlpha = alpha;
     if (blurFit) {
@@ -793,20 +793,7 @@ export class Player {
     }
     if (filterStr) ctx.filter = filterStr;
     try {
-      if (cue.fx.pixelate > 1) {
-        // the re-uploaded-at-240p texture: render small, scale up without smoothing
-        const k = cue.fx.pixelate;
-        const pw = Math.max(16, Math.round(vw / k)), ph = Math.max(9, Math.round(vh / k));
-        const pix = this.scratchCanvas('pix', pw, ph);
-        const px = pix.getContext('2d');
-        px.clearRect(0, 0, pw, ph);
-        px.drawImage(el, (dx - vx) / k, (dy - vy) / k, dw / k, dh / k);
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(pix, vx, vy, vw, vh);
-        ctx.imageSmoothingEnabled = true;
-      } else {
-        ctx.drawImage(el, dx, dy, dw, dh);
-      }
+      ctx.drawImage(el, dx, dy, dw, dh);
     } catch (err) { /* decoder hiccup; skip frame */ }
     ctx.filter = 'none';
     if (cue.fx.aberration > 0 && alpha >= 1) this.aberrate(vx, vy, vw, vh, cue.fx.aberration);
