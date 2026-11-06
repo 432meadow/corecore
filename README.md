@@ -148,8 +148,9 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 | v | cycle 16:9, 9:16, 1:1, 2.39:1 |
 | x | ban the current clip (removed from the pool for good) |
 
-The URL carries `seed`, `mode`, `tags`, `edge` and `clipfx`, and `aspect` once a frame has been chosen, so
-a link reproduces a stream over the same pool; `[ share this stream ]` in the controls copies it.
+The URL carries `seed`, `mode`, `tags`, `edge` and `clipfx`, so a link reproduces a stream over the same
+pool; `[ share this stream ]` in the controls copies it. The frame belongs to the screen: a phone always opens
+in its own (9:16 held upright) and a link never carries one; on a computer `?aspect=` typed in sets it.
 
 **Between streams.** A new seed (or the live channel) does not cut: the picture fades out to the page over
 half a second and the sound with it, a full second of silence on the empty page, then the new stream fades

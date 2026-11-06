@@ -32,8 +32,11 @@ const state = {
   live: params.get('seed') === 'live',
   seed: params.get('seed') === 'live' ? liveSeed() : (params.get('seed') || randomSeed()),
   mode: MODES[params.get('mode')] ? params.get('mode') : 'corecore',
-  aspect: ASPECTS.includes(params.get('aspect')) ? params.get('aspect') : defaultAspect(),
-  aspectChosen: ASPECTS.includes(params.get('aspect')),   // a frame picked by hand (or in a shared link) stays put
+  // The frame belongs to the screen, not the link: a phone always opens in its own (9:16 held upright), whatever
+  // an address says, and the address never carries one. On a computer ?aspect= typed in still sets the frame
+  // (a projection in scope, say). A frame picked by hand holds for the visit.
+  aspect: !PHONE && ASPECTS.includes(params.get('aspect')) ? params.get('aspect') : defaultAspect(),
+  aspectChosen: !PHONE && ASPECTS.includes(params.get('aspect')),
   tags: (params.get('tags') || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
   edge: params.has('edge') ? Math.max(0, Math.min(1, Number(params.get('edge')) || 0)) : EDGE_DEFAULT,
   clipfx: Object.keys(CLIPFX).includes(params.get('clipfx')) ? params.get('clipfx') : 'speaker',
@@ -139,7 +142,6 @@ function setTheme(t) {
 
 function syncUrl() {
   const p = new URLSearchParams({ seed: state.live ? 'live' : state.seed, mode: state.mode });
-  if (state.aspectChosen) p.set('aspect', state.aspect);   // otherwise each screen opens a link in its own frame
   if (state.tags.length) p.set('tags', state.tags.join(','));
   if (state.edge !== EDGE_DEFAULT) p.set('edge', String(state.edge));
   if (state.clipfx !== 'speaker') p.set('clipfx', state.clipfx);
