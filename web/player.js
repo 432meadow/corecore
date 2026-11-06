@@ -10,7 +10,7 @@ const FLASH_SECONDS = 0.14;
 // A clip cued too near the head of its file to be backed up for the pre-roll creeps up to its cut instead,
 // rolling at this fraction of its speed, so it still arrives on (near enough) the frame the edit asked for.
 const CREEP = 0.1;
-const PREROLL_MAX = 1.5;   // seconds: the longest the pre-roll grows to on a device slow to start a clip
+const PREROLL_MAX = 1.0;   // seconds: the longest the pre-roll grows to on a device slow to start a clip
 // The page behind the picture. Dark is the screen; light is an off-white sheet, where captions are set in
 // ink with a pale halo and the vignette is gentler, so the picture reads as a print rather than a window.
 const FIELDS = {
@@ -272,26 +272,22 @@ export class Player {
     }
   }
 
-  // A frame callback runs on each element for as long as it holds a clip. In Safari this is what lets the canvas
-  // draw a video without waiting. A video the page cannot see decodes no pictures until something asks for one,
-  // and when a canvas draw is the first to ask, it holds the whole page, up to a second, until a picture comes:
-  // the freeze at each cut, and then (when the next clip was drawn early to get it over with) just before it. A
-  // frame callback asks without waiting, so pictures are decoding long before the cut, and while it runs the
-  // canvas draws the pictures it brings without asking at all. Elsewhere it costs next to nothing.
+  // One frame callback for each clip as it is prepared, and only one. In Safari a video the page cannot see decodes
+  // no pictures until something asks, and a canvas draw that is the first to ask holds the whole page, up to a
+  // second, until a picture comes: a freeze at each cut. A frame callback asks without waiting, so the clip's
+  // pictures are on their way long before its cut. But while a callback is pending, Safari's canvas draws only
+  // the picture that callback brought, not the one for the current time: kept running (as it once was) it made
+  // every clip as choppy as the callbacks were slow. So one callback, left to lapse, and any still pending is
+  // cancelled at the cut: what is on screen is always drawn as it plays.
   watchFrames(slot) {
     const el = slot.el;
     if (typeof el.requestVideoFrameCallback !== 'function') return;
     this.unwatchFrames(slot);
-    const token = slot.frameToken;
-    const again = () => {
-      if (slot.frameToken !== token) return;
-      slot.frameReq = el.requestVideoFrameCallback(again);
-    };
-    slot.frameReq = el.requestVideoFrameCallback(again);
+    const req = el.requestVideoFrameCallback(() => { if (slot.frameReq === req) slot.frameReq = null; });
+    slot.frameReq = req;
   }
 
   unwatchFrames(slot) {
-    slot.frameToken = (slot.frameToken || 0) + 1;
     if (slot.frameReq == null) return;
     try { slot.el.cancelVideoFrameCallback(slot.frameReq); } catch (e) { /* gone with its source */ }
     slot.frameReq = null;
@@ -538,6 +534,7 @@ export class Player {
     next.end = this.origin != null && next.at != null ? Math.max(now + 0.1, this.origin + next.at + next.dur) : now + next.dur;
     if (next.kind === 'clip') {
       const el = next.slot.el;
+      this.unwatchFrames(next.slot);   // drawn from now on: from the current frame, never a callback's picture
       el.muted = false;   // it rolled muted
       this.audio.setClipGain(el, next.audio.clip || 0);
       el.playbackRate = Math.max(0.1, Math.min(4, next.ramp ? next.ramp.from : next.speed));   // a creep ends here
