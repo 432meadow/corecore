@@ -18,8 +18,12 @@ const FIELDS = {
   light: { rgb: [250, 250, 250], bg: 'rgb(250,250,250)', ink: '#121212', inkSoft: '#2a2a2a', halo: 'rgba(250,250,250,0.9)', vignette: 0.6, light: true },
 };
 const FIELD_FADE_MS = 700;   // the page changes colour as slowly as the controls around it do
-// Canvas filters (blur, saturate...) are missing in some browsers; setting ctx.filter there does nothing.
+// Canvas filters (blur, saturate...) are missing in some browsers (Safari keeps them behind a setting); setting
+// ctx.filter there does nothing, and the haze is softened another way. Firefox has them but runs them on the CPU,
+// a 1280x720 blur and colour filter on every frame and fresh scratch images for each: every clip lagged and CPU
+// and memory climbed. So Firefox takes the way without them too, as Safari does. setFilters() overrides.
 const CAN_FILTER = typeof CanvasRenderingContext2D !== 'undefined' && 'filter' in CanvasRenderingContext2D.prototype;
+const FIREFOX = typeof navigator !== 'undefined' && /\bFirefox\//.test(navigator.userAgent);
 
 function waitEvent(el, ev, timeout) {
   return new Promise((resolve, reject) => {
@@ -85,10 +89,10 @@ export class Player {
     this.snapEnabled = true;
     // the pre-roll: the next clip starts playing this long before its cut, unseen and silent, so at the cut it
     // is already moving. A phone takes a few hundred milliseconds to start a standing clip, longer where it
-    // fetches nothing ahead (iOS), so the lead grows to what this device has been seen to need. Phones and
-    // tablets only, where clips stood still at their cuts: a computer starts clips from a standing frame at
-    // the cut as before (desktop Firefox played every clip choppily with it). setPreroll() overrides.
-    this.prerollOn = matchMedia('(pointer: coarse)').matches;
+    // fetches nothing ahead (iOS), so the lead grows to what this device has been seen to need. Not in desktop
+    // Firefox, which never froze at its cuts and needs no second video to decode. setPreroll() overrides.
+    this.prerollOn = matchMedia('(pointer: coarse)').matches || !FIREFOX;
+    this.filters = CAN_FILTER && !FIREFOX;
     this.prerollMin = 0.5;
     this.preroll = this.prerollMin;
     this.startLag = 0;   // seconds a rolled clip has lately taken to start moving: the slowest at once, decaying
@@ -187,7 +191,7 @@ export class Player {
     const px = pic.getContext('2d');
     px.globalCompositeOperation = 'source-over';
     px.clearRect(0, 0, W, H);
-    if (CAN_FILTER) px.drawImage(this.canvas, 0, 0);
+    if (this.filters) px.drawImage(this.canvas, 0, 0);
     else {   // no canvas blur in this browser: soften the haze by a trip through a smaller canvas instead
       const k = 1 / (1 + 1.2 * this.edge), sw = Math.max(2, Math.round(W * k)), sh = Math.max(2, Math.round(H * k));
       const soft = this.scratchCanvas('soft', sw, sh), sx = soft.getContext('2d');
@@ -277,6 +281,10 @@ export class Player {
 
   setPreroll(on) {
     this.prerollOn = !!on;
+  }
+
+  setFilters(on) {
+    this.filters = CAN_FILTER && !!on;
   }
 
   // One frame callback for each clip as it is prepared, and only one. In Safari a video the page cannot see decodes
@@ -771,15 +779,15 @@ export class Player {
     if (g.filter) filters.push(g.filter);
     // the haze: a slight gaussian blur before the grain; not on the low-res texture, whose blocks are the point
     if (this.edge > 0 && !(cue.fx.pixelate > 1)) filters.push(`blur(${(1.6 * this.edge).toFixed(2)}px)`);
-    const filterStr = CAN_FILTER ? filters.join(' ') : '';
+    const filterStr = this.filters ? filters.join(' ') : '';
     ctx.globalAlpha = alpha;
     if (blurFit) {
       const bg = this.scratchCanvas('bg', 160, 90);
       const bx = bg.getContext('2d');
-      bx.filter = 'blur(6px) brightness(0.45)';
+      if (this.filters) bx.filter = 'blur(6px) brightness(0.45)';
       try { bx.drawImage(el, 0, 0, 160, 90); } catch (err) { /* skip */ }
-      bx.filter = 'none';
-      if (!CAN_FILTER) { bx.fillStyle = 'rgba(0,0,0,0.55)'; bx.fillRect(0, 0, 160, 90); }   // the darkening, without filters
+      if (this.filters) bx.filter = 'none';
+      else { bx.fillStyle = 'rgba(0,0,0,0.55)'; bx.fillRect(0, 0, 160, 90); }   // the darkening, without filters
       if (filterStr) ctx.filter = filterStr;
       ctx.drawImage(bg, vx, vy, vw, vh);
     }
@@ -854,9 +862,9 @@ export class Player {
     if (g.bloom > 0) {   // highlights bleed a little, from a tiny blurred copy of the picture
       const bl = this.scratchCanvas('bloom', 160, 90);
       const bx = bl.getContext('2d');
-      bx.filter = 'blur(4px) brightness(1.1) contrast(1.3)';
+      if (this.filters) bx.filter = 'blur(4px) brightness(1.1) contrast(1.3)';
       bx.drawImage(this.canvas, vx, vy, vw, vh, 0, 0, 160, 90);
-      bx.filter = 'none';
+      if (this.filters) bx.filter = 'none';
       ctx.globalCompositeOperation = 'screen';
       ctx.globalAlpha = g.bloom;
       ctx.drawImage(bl, vx, vy, vw, vh);

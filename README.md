@@ -155,10 +155,15 @@ a link reproduces a stream over the same pool; `[ share this stream ]` in the co
 half a second and the sound with it, a full second of silence on the empty page, then the new stream fades
 in, picture and sound together. A second switch made during the fade takes its place.
 
-**No standing start.** On a phone or tablet a clip does not start from a still frame at its cut. The next one
-starts playing, muted and unseen, half a second before its cut, so it is already moving when it appears, and
-its sound comes up at the cut. A computer starts each clip at its cut, as before (desktop Firefox played
-every clip choppily with the pre-roll); `?preroll=1` tries it there, `?preroll=0` turns it off on a phone. The lead grows to what the device is
+**No standing start.** A clip does not start from a still frame at its cut. The next one starts playing,
+muted and unseen, half a second before its cut, so it is already moving when it appears, and its sound
+comes up at the cut. Desktop Firefox, which never froze at its cuts, starts each clip at its cut instead;
+`?preroll=1` or `?preroll=0` forces either way.
+
+**Filters.** The haze's blur and the grades' colour filters are canvas filters. Safari keeps those behind a
+setting, so it softens the haze with a trip through a smaller canvas and leaves the colour be; Firefox runs
+them on the CPU, which made every clip lag, so it takes Safari's way too. `?filters=0` or `?filters=1` forces
+either way where the browser has them. The lead grows to what the device is
 seen to need, up to a second, where clips are slow to start. A clip cued at the head of its
 file, such as a voice, plays its lead at a tenth of its speed instead, so the first words are kept.
 In Safari a canvas's first draw of a new clip holds the whole page until that clip's first picture is
