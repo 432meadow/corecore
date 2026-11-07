@@ -188,8 +188,8 @@ status line (mode · seed · state) and the source of the clip on screen sit at 
 
 **Moderating.** On the published site `[ ban this clip ]` (key `x`) hides the clip on screen in that
 browser at once. `[ copy bans ]` copies that browser's bans as lines naming each clip by its source and the
-second it starts at (`archive:tiktok-7130942596586818818@12.5`); pasted into `bans.txt`, they hold for
-everyone from the next build. Nothing is deleted, so a line taken out brings its clip back; a line without
+second it starts at (`archive:tiktok-7130942596586818818@12.5`); pasted into `bans.txt` and pushed, they hold for
+everyone from the build that push starts. Nothing is deleted, so a line taken out brings its clip back; a line without
 `@` takes out every clip of a source. Footage that must never show goes in `BANNED_SOURCES` in
 `corecore/config.py` instead, which deletes it from the pool.
 
