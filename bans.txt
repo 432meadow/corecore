@@ -104,3 +104,7 @@ archive:Flickr-29975934484@30.59      # an end card
 archive:SunsetTimeLapseCCBYNatureClip@24.5  # black throughout
 archive:periscope-1djGXoDLnlLKZ@369.98      # the picture on its side
 archive:periscope-1LyxBakMAnoJN@833.0       # a frozen opening, the stream stalled
+
+# A Periscope stream that keeps stalling: three cuts open on a frozen picture, and one stops its picture halfway.
+
+archive:periscope-1LyxBakMAnoJN               # a stream that stalls
