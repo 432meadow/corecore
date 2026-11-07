@@ -18,15 +18,17 @@ STATIC_TAG = '<script>window.CORECORE_STATIC = "manifest.json";</script>'
 _IMPORT_RE = re.compile(r"""(\bfrom\s+['"]\./[^'"?]+\.js)(['"])""")
 
 
-def select_clips(rows: list, media_dir: Path, max_bytes: int, max_clips: int) -> tuple[list, int]:
-    """Round-robin across sources (so the export is varied, not the first N files) until a budget is hit."""
+def select_clips(rows: list, media_dir: Path, max_bytes: int, max_clips: int,
+                 per_source: int | None = None) -> tuple[list, int]:
+    """Round-robin across sources (so the export is varied, not the first N files) until a budget is hit, taking
+    at most `per_source` clips of any one source when that is set."""
     by_source: dict[int, list] = defaultdict(list)
     for r in rows:
         by_source[r["source_id"]].append(r)
     queues = []
     for sid, lst in sorted(by_source.items()):
         random.Random(sid).shuffle(lst)
-        queues.append(lst)
+        queues.append(lst[:per_source] if per_source else lst)
     random.Random(0).shuffle(queues)
     chosen: list = []
     total = 0
@@ -52,6 +54,9 @@ def select_clips(rows: list, media_dir: Path, max_bytes: int, max_clips: int) ->
 # Clips scraped for the sunset variation carry this tag. They are published within a budget of their own, so the
 # variation has its footage without the sunsets crowding the main mix (which leans on nature easily enough).
 SUNSET = db.SUNSET
+# At most this many clips of one sunset source: a locked-off time-lapse cut three ways gives three near-identical
+# shots, so the sunsets take two of each and leave the rest of their budget unspent rather than repeat themselves.
+SUNSET_PER_SOURCE = 2
 
 
 def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 1024 * 1024, max_clips: int = 2000,
@@ -104,7 +109,7 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
     main = [r for r in rows if SUNSET not in db.tags_from_db(r["tags"])]
     sun = [r for r in rows if SUNSET in db.tags_from_db(r["tags"])]
     chosen, planned = select_clips(main, config.MEDIA_DIR, max_bytes, max_clips)
-    sun_chosen, sun_planned = select_clips(sun, config.MEDIA_DIR, sunset_bytes, max_clips)
+    sun_chosen, sun_planned = select_clips(sun, config.MEDIA_DIR, sunset_bytes, max_clips, per_source=SUNSET_PER_SOURCE)
     log(f"exporting {len(chosen)} of {len(main)} clips (~{planned // 2**20} MB) and {len(sun_chosen)} of {len(sun)} "
         f"sunset clips (~{sun_planned // 2**20} MB) to {out}")
     manifest_clips = []

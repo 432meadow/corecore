@@ -337,6 +337,11 @@ class ExportTest(unittest.TestCase):
             size = lambda ext: (config.SEGMENTS_DIR / f"{ext}.mp4").stat().st_size
             tight = export_site(Path(d) / "tight", max_bytes=size("tiktok-2"), sunset_bytes=size("sunset-1"), log=quiet)
             self.assertEqual((tight["clips"], tight["sunset_clips"]), (2, 1))
+        # at most two clips of one sunset source; the main mix has no such cap
+        from corecore.export import select_clips
+        rows = [{"source_id": 1, "file": f"segments/{ext}.mp4"} for ext in ("tiktok-2", "sunset-1", "tiktok-2")]
+        self.assertEqual(len(select_clips(rows, config.MEDIA_DIR, 10**9, 100, per_source=2)[0]), 2)
+        self.assertEqual(len(select_clips(rows, config.MEDIA_DIR, 10**9, 100)[0]), 3)
         with db.connect() as conn:
             conn.execute("DELETE FROM sources")
 
