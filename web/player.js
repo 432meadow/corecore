@@ -714,10 +714,12 @@ export class Player {
     return !!(w && h && h > w);
   }
 
+  // The 16:9 frame, a computer's own, holds its shape: a mode's occasional letterbox (a 4:3 or scope band) is
+  // drawn only in the other frames. The sequencer still makes its draws, so a seed cuts the same either way.
   viewport(cue) {
     const W = this.canvas.width, H = this.canvas.height;
     let vx = 0, vy = 0, vw = W, vh = H;
-    const lb = this.fillsFrame(cue) ? null : cue.fx?.letterbox;
+    const lb = this.aspect === '16:9' || this.fillsFrame(cue) ? null : cue.fx?.letterbox;
     if (lb === '4:3') {
       if (W >= H) { vw = Math.min(W, Math.round(H * 4 / 3)); vx = Math.round((W - vw) / 2); }
       else { vh = Math.min(H, Math.round(W * 3 / 4)); vy = Math.round((H - vh) / 2); }

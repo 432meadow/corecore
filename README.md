@@ -78,7 +78,7 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   `juxtapose`, `build`, `burst`, `climax`, `black`). Each cycle picks a contrast pair of tags, one or two
   motif clips that come back, and durations/speeds/treatments from the current mode's parameters.
 - **Player** (`web/player.js`): cuts on the AudioContext clock, cover-fits clips with a slow push-in,
-  adds grain, vignette, flashes, letterboxing, shake, double exposure, freeze frames and captions, and
+  adds grain, vignette, flashes, letterboxing (outside 16:9), shake, double exposure, freeze frames and captions, and
   lets the desk's mouse clicks pull a cut forward.
 - **The desk** (`web/desk.js`): the only sound there is. Instead of music, a room with a computer in it:
   a PC fan with a blade tone that speeds up when the edit gets frantic, mouse clicks and scroll-wheel
@@ -120,7 +120,9 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
   into a band: in 9:16 every clip (a wide one keeps near its middle and drifts slowly across during the
   shot, a tenth of the frame a second, so what it holds passes through), in 16:9 and 1:1 a phone clip
   (keeping its upper middle, where faces are). Only the 2.39:1 frame shows phone footage whole, over a
-  soft dark copy of itself, since a fill there would keep a quarter of its height.
+  soft dark copy of itself, since a fill there would keep a quarter of its height. 16:9, a computer's
+  default, keeps its shape for every clip; a mode's occasional letterbox (a 4:3 or scope band) is drawn only
+  in the other frames.
 - **Words**: for now the picture carries none of its own. The built-in caption lists at the top of
   `web/sequencer.js` are empty while new ones are written, and the found titles (a source's own title used
   as a caption, `useTitles` in each mode) are off; lines typed in the words box are still shown.
