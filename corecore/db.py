@@ -118,29 +118,45 @@ def tag_like(tag: str) -> str | None:
     return f"%,{t},%"
 
 
+# The tag that sets a clip apart for the sunset variation: published within a budget of its own, played under
+# [ sunsets ] and left out of the main mix.
+SUNSET = "sunset"
+
+
+def clip_filter(tags: list[str] | None = None, only: str | None = None,
+                without: list[str] | None = None) -> tuple[list[str], list] | None:
+    """WHERE terms over `clips c` for the playable clips carrying any of `tags`, `only` as well, and none of
+    `without`, with their parameters. None when the filter can match nothing (a tag that normalises to nothing)."""
+    where = ["c.banned = 0"]
+    params: list = []
+    if tags:
+        patterns = [p for p in (tag_like(t) for t in tags) if p]
+        if not patterns:
+            return None
+        where.append("(" + " OR ".join("c.tags LIKE ? ESCAPE '\\'" for _ in patterns) + ")")
+        params.extend(patterns)
+    if only:
+        pattern = tag_like(only)
+        if not pattern:
+            return None
+        where.append("c.tags LIKE ? ESCAPE '\\'")
+        params.append(pattern)
+    for pattern in [p for p in (tag_like(t) for t in (without or [])) if p]:
+        where.append("COALESCE(c.tags, '') NOT LIKE ? ESCAPE '\\'")   # NULL NOT LIKE is NULL: keep untagged clips
+        params.append(pattern)
+    return where, params
+
+
 def sample_clips(conn: sqlite3.Connection, n: int = 100, tags: list[str] | None = None,
                  exclude: list[int] | None = None, seed: int | None = None, only: str | None = None,
                  without: list[str] | None = None) -> list[sqlite3.Row]:
     """Random sample of playable clips, joined with their source. A seed makes the order repeatable
     over an unchanged pool (a seeded shuffle of the matching ids). `tags`: carrying any of these; `only`:
     carrying this one as well; `without`: carrying none of these."""
-    where = ["c.banned = 0"]
-    params: list = []
-    if tags:
-        patterns = [p for p in (tag_like(t) for t in tags) if p]
-        if not patterns:
-            return []
-        where.append("(" + " OR ".join("c.tags LIKE ? ESCAPE '\\'" for _ in patterns) + ")")
-        params.extend(patterns)
-    if only:
-        pattern = tag_like(only)
-        if not pattern:
-            return []
-        where.append("c.tags LIKE ? ESCAPE '\\'")
-        params.append(pattern)
-    for pattern in [p for p in (tag_like(t) for t in (without or [])) if p]:
-        where.append("COALESCE(c.tags, '') NOT LIKE ? ESCAPE '\\'")   # NULL NOT LIKE is NULL: keep untagged clips
-        params.append(pattern)
+    f = clip_filter(tags, only, without)
+    if f is None:
+        return []
+    where, params = f
     if exclude:
         exclude = [int(x) for x in exclude][:2000]
         where.append(f"c.id NOT IN ({','.join('?' * len(exclude))})")
@@ -168,15 +184,25 @@ def clip_to_dict(row: sqlite3.Row) -> dict:
     return d
 
 
-def stats(conn: sqlite3.Connection) -> dict:
-    clips = conn.execute("SELECT COUNT(*) FROM clips WHERE banned = 0").fetchone()[0]
+def stats(conn: sqlite3.Connection, tags: list[str] | None = None, only: str | None = None,
+          without: list[str] | None = None) -> dict:
+    """The pool's figures. With a filter (as sample_clips takes it) they are the figures of the clips it lets
+    through, exact however large the pool, and `sources` counts the sources those clips come from."""
     banned = conn.execute("SELECT COUNT(*) FROM clips WHERE banned = 1").fetchone()[0]
-    sources = conn.execute("SELECT COUNT(*) FROM sources WHERE status = 'done'").fetchone()[0]
-    total_seconds = conn.execute("SELECT COALESCE(SUM(duration), 0) FROM clips WHERE banned = 0").fetchone()[0]
+    filtered = bool(tags or only or without)
+    f = clip_filter(tags, only, without)
+    if f is None:
+        return {"clips": 0, "banned": banned, "sources": 0, "seconds": 0.0, "with_audio": 0, "tags": {}}
+    where = " AND ".join(f[0])
+    params = f[1]
+    clips, total_seconds, with_audio, from_sources = conn.execute(
+        "SELECT COUNT(*), COALESCE(SUM(c.duration), 0), COALESCE(SUM(c.has_audio = 1), 0), "
+        f"COUNT(DISTINCT c.source_id) FROM clips c WHERE {where}", params).fetchone()
+    sources = (from_sources if filtered
+               else conn.execute("SELECT COUNT(*) FROM sources WHERE status = 'done'").fetchone()[0])
     counter: Counter[str] = Counter()
-    for (tags,) in conn.execute("SELECT tags FROM clips WHERE banned = 0"):
-        counter.update(tags_from_db(tags))
-    with_audio = conn.execute("SELECT COUNT(*) FROM clips WHERE banned = 0 AND has_audio = 1").fetchone()[0]
+    for (t,) in conn.execute(f"SELECT c.tags FROM clips c WHERE {where}", params):
+        counter.update(tags_from_db(t))
     return {
         "clips": clips,
         "banned": banned,

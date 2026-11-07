@@ -13,11 +13,14 @@ export class Catalog {
     this.tags = tags;          // when set, only clips carrying one of these tags are played
     this.footage = footage;
     this.sunsets = null;       // how many sunset clips the pool holds, once known
+    this.others = null;        // and how many besides them
+    this.turned = false;       // set when what plays changed under the stream (see refreshStats)
     this.pool = [];
     this.recent = [];
     this.bad = new Set();
     this.stats = { clips: 0, with_audio: 0, tags: {} };
     this.fetching = null;
+    this.epoch = 0;            // counts the changes to what plays: an answer to an earlier question is dropped
     this.generation = 0;
   }
 
@@ -26,23 +29,38 @@ export class Catalog {
   // sunsets asked for and none in the pool: the main mix plays meanwhile
   get footageEmpty() { return this.footage === SUNSET && this.sunsets === 0; }
 
+  // What plays, as the static edition has it: the sunsets alone, or the main mix without them; while the pool
+  // holds only one of the two (or nothing is known of it yet), all of it.
+  get playing() {
+    if (this.footage === SUNSET && this.sunsets) return SUNSET;
+    return this.sunsets && this.others ? 'main' : 'all';
+  }
+
+  // The pool's figures, then those of what plays, which the server counts with the filter its samples take, so
+  // they are exact however large the pool. When sunsets arrive (or the last clip besides them goes) what plays
+  // changes: the pool is emptied for the new footage, and `turned` tells the app it is another stream now.
   async refreshStats() {
     const r = await fetch('api/stats');
-    this.stats = await r.json();
-    this.sunsets = this.stats.tags?.[SUNSET] || 0;
-    if (this.tags.length || this.sunsets) {   // restrict the sequencer's view of the pool to what plays
-      const r2 = await fetch(`api/clips/sample?${this.filterParams(new URLSearchParams({ n: '500' }))}`);
-      const j = await r2.json();
-      this.stats = Object.assign({}, this.stats, computeStats(j.clips || []));
-    }
+    const all = await r.json();
+    const known = this.sunsets !== null, before = this.playing;
+    this.sunsets = all.tags?.[SUNSET] || 0;
+    this.others = (all.clips || 0) - this.sunsets;
+    if (known && this.playing !== before) { this.setTags(this.tags); this.turned = true; }
+    const params = this.filterParams(new URLSearchParams());
+    if ([...params.keys()].length) {
+      const r2 = await fetch(`api/stats?${params}`);
+      this.stats = await r2.json();
+    } else this.stats = all;
     return this.stats;
   }
 
-  // the chosen tags (any of them) and the footage (the sunsets alone, or the main mix without them)
+  // the chosen tags (any of them) within what plays; the main mix has no sunsets, so that tag means nothing there
   filterParams(params) {
-    if (this.tags.length) params.set('tags', this.tags.join(','));
-    if (this.footage === SUNSET && !this.footageEmpty) params.set('only', SUNSET);
-    else params.set('without', SUNSET);
+    const playing = this.playing;
+    const tags = playing === 'main' ? this.tags.filter((t) => t !== SUNSET) : this.tags;
+    if (tags.length) params.set('tags', tags.join(','));
+    if (playing === SUNSET) params.set('only', SUNSET);
+    else if (playing === 'main') params.set('without', SUNSET);
     return params;
   }
 
@@ -51,6 +69,9 @@ export class Catalog {
     this.pool = [];
     this.recent = [];
     this.generation = 0;
+    this.epoch++;              // a refill still on its way was asked for the old pool
+    this.fetching = null;
+    this.backoffUntil = 0;
   }
 
   setFootage(footage) {
@@ -64,7 +85,8 @@ export class Catalog {
     if (this.fetching) return this.fetching;
     if (this.backoffUntil && performance.now() < this.backoffUntil) return this.pool.length;
     this.lastFill = performance.now();
-    this.fetching = (async () => {
+    const epoch = this.epoch;
+    const job = (async () => {
       const total = this.stats.clips || 0;
       const cap = Math.max(8, Math.min(300, Math.floor(total * 0.5)));
       if (this.recent.length > cap) this.recent.splice(0, this.recent.length - cap);
@@ -72,14 +94,16 @@ export class Catalog {
       const start = this.pool.length;
       for (const recent of [this.recent.slice(-cap), this.recent.slice(-Math.min(6, cap)), []]) {
         const before = this.pool.length;
-        await this.fetchInto(n, [...recent, ...this.bad]);
+        await this.fetchInto(n, [...recent, ...this.bad], epoch);
+        if (epoch !== this.epoch) return this.pool.length;   // what plays changed meanwhile: a fresh fill takes over
         if (this.pool.length - before >= want) break;
       }
       this.backoffUntil = this.pool.length === start ? performance.now() + 3000 : 0;
       return this.pool.length;
-    })().catch((err) => { this.backoffUntil = performance.now() + 3000; throw err; })
-      .finally(() => { this.fetching = null; });
-    return this.fetching;
+    })().catch((err) => { if (epoch === this.epoch) this.backoffUntil = performance.now() + 3000; throw err; })
+      .finally(() => { if (this.fetching === job) this.fetching = null; });
+    this.fetching = job;
+    return job;
   }
 
   // Forget play history so a reseed replays the same decisions (the live channel depends on it).
@@ -89,13 +113,14 @@ export class Catalog {
     this.backoffUntil = 0;
   }
 
-  async fetchInto(n, exclude) {
+  async fetchInto(n, exclude, epoch = this.epoch) {
     const params = new URLSearchParams({ n: String(n), exclude: exclude.join(',') });
     if (this.seed != null) params.set('seed', String((this.seed + this.generation++) >>> 0));
     this.filterParams(params);
     const r = await fetch(`api/clips/sample?${params}`);
     if (!r.ok) throw new Error(`sample failed: ${r.status}`);
     const j = await r.json();
+    if (epoch !== this.epoch) return;   // asked for another pool than this one
     const have = new Set(this.pool.map((c) => c.id));
     for (const c of j.clips || []) {
       if (!have.has(c.id) && !this.bad.has(c.id)) this.pool.push(c);
@@ -198,6 +223,7 @@ export class StaticCatalog extends Catalog {
     const sun = this.everything.filter((c) => c.tags.includes(SUNSET));
     const main = this.everything.filter((c) => !c.tags.includes(SUNSET));
     this.sunsets = sun.length;
+    this.others = main.length;
     const base = this.footage === SUNSET && sun.length ? sun : (main.length ? main : this.everything);
     if (!this.tags.length) return base;
     const want = new Set(this.tags);

@@ -21,6 +21,17 @@ PREFERRED_FORMATS = ["h.264 IA", "h.264", "512Kb MPEG4", "MPEG4", "HiRes MPEG4",
 SMALL_FIRST = ["512Kb MPEG4", "h.264 IA", "h.264", "MPEG4", "MPEG4 (H.264)", "HiRes MPEG4", "h.264 HD"]
 _DETAILS_RE = re.compile(r"archive\.org/(?:details|download|embed)/([^/?#]+)")
 
+# Directives after the query itself: "|sort=date desc" orders the results; "|skip=id1,id2" passes over items that
+# were seen and found wanting, in the results only, so each page still starts where it did and the rest of what
+# a job takes stays as it was rated (a NOT in the query would shift every later page instead).
+_DIRECTIVE_RE = re.compile(r"\|(sort|skip)=")
+
+
+def split_directives(query: str) -> tuple[str, dict[str, str]]:
+    """'q |sort=date desc |skip=a,b' -> ('q', {'sort': 'date desc', 'skip': 'a,b'})."""
+    parts = _DIRECTIVE_RE.split(query)
+    return parts[0].strip(), {parts[i]: parts[i + 1].strip() for i in range(1, len(parts) - 1, 2)}
+
 
 def _get_json(url: str, timeout: float = 60) -> dict:
     req = urllib.request.Request(url, headers={"User-Agent": config.HTTP_USER_AGENT, "Accept": "application/json"})
@@ -135,10 +146,9 @@ class ArchiveProvider(Provider):
                               license=str(_first(md.get("licenseurl")) or ""))]
         if not query:
             raise ProviderError("archive provider needs a query or an item URL")
-        sort = "downloads desc"
-        if "|sort=" in query:  # e.g. "collection:mirrortube AND title:(vlog) |sort=date desc"
-            query, _, sort = query.partition("|sort=")
-            query, sort = query.strip(), sort.strip() or "downloads desc"
+        query, directives = split_directives(query)   # e.g. "collection:mirrortube AND title:(vlog) |sort=date desc"
+        sort = directives.get("sort") or "downloads desc"
+        skip = {i.strip() for i in directives.get("skip", "").split(",") if i.strip()}
         q = query if "mediatype:" in query else f"({query}) AND mediatype:movies"
         rows = max(1, max_items * 3)
         env_page = os.environ.get("CORECORE_ARCHIVE_PAGE", "1")  # rotate pages across scheduled builds for fresh material
@@ -158,6 +168,8 @@ class ArchiveProvider(Provider):
             if dur and dur > config.MAX_SOURCE_DURATION:
                 continue
             ident = d.get("identifier")
+            if ident in skip:
+                continue
             if not ident or config.blocked_source(str(_first(d.get("title")) or ""), str(_first(d.get("creator")) or "")):
                 continue
             if config.hard_blocked(_text(d.get("description")) + " " + _text(d.get("subject"))):

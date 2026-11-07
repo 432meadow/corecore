@@ -333,6 +333,10 @@ class ExportTest(unittest.TestCase):
             sun = export_site(Path(d) / "sun", max_bytes=0, log=quiet)
             self.assertEqual((sun["clips"], sun["sunset_clips"]), (1, 1))
             self.assertEqual(export_site(Path(d) / "tagged", tags=["modern"], log=quiet)["clips"], 2)
+            # budgets sized to the clips: each footage spends its own in full, whatever the other spent
+            size = lambda ext: (config.SEGMENTS_DIR / f"{ext}.mp4").stat().st_size
+            tight = export_site(Path(d) / "tight", max_bytes=size("tiktok-2"), sunset_bytes=size("sunset-1"), log=quiet)
+            self.assertEqual((tight["clips"], tight["sunset_clips"]), (2, 1))
         with db.connect() as conn:
             conn.execute("DELETE FROM sources")
 
@@ -404,6 +408,38 @@ class ReviewRegressionTest(unittest.TestCase):
                 self.assertEqual(row["status"], "done")
                 conn.execute("DELETE FROM sources")
 
+    def test_an_unfinished_source_keeps_its_footage(self):
+        from corecore.ingest import ingest_candidate, keep_footage
+        from corecore.providers import Candidate
+        self.assertEqual(keep_footage(["light", "beauty"], ["sunset", "modern"]), ["sunset", "light", "beauty"])
+        self.assertEqual(keep_footage(["sunset", "modern"], ["light", "beauty"]), ["modern"])
+        db.init()
+        quiet = lambda m: None
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "v.mp4"
+            _tiny_video(src)
+            cand = Candidate("local", str(src), src.as_uri(), title="v", extra={"keep": True})
+            try:
+                # found for the sunsets, stopped by the time budget, then finished by a job for the main mix
+                ingest_candidate(cand, ["sunset", "modern"], logger=quiet, should_cancel=lambda: True)
+                self.assertGreaterEqual(ingest_candidate(cand, ["light", "beauty", "modern"], logger=quiet), 1)
+                with db.connect() as conn:
+                    row = conn.execute("SELECT id, tags FROM sources WHERE external_id = ?", (str(src),)).fetchone()
+                    self.assertIn("sunset", db.tags_from_db(row["tags"]))
+                    self.assertIn("beauty", db.tags_from_db(row["tags"]))
+                    clip_tags = [db.tags_from_db(r["tags"]) for r in conn.execute("SELECT tags FROM clips WHERE source_id = ?", (row["id"],))]
+                    self.assertTrue(clip_tags and all("sunset" in t for t in clip_tags))
+                    conn.execute("DELETE FROM sources")
+                # and the other way round: found for the main mix, finished by a sunset job, stays in the main mix
+                ingest_candidate(cand, ["light", "modern"], logger=quiet, should_cancel=lambda: True)
+                ingest_candidate(cand, ["sunset", "modern"], logger=quiet)
+                with db.connect() as conn:
+                    tags = [db.tags_from_db(r["tags"]) for r in conn.execute("SELECT tags FROM clips")]
+                    self.assertTrue(tags and not any("sunset" in t for t in tags))
+            finally:
+                with db.connect() as conn:
+                    conn.execute("DELETE FROM sources")
+
     def test_tag_filters_escape_like_wildcards(self):
         db.init()
         with db.connect() as conn:
@@ -428,7 +464,36 @@ class ReviewRegressionTest(unittest.TestCase):
             self.assertEqual(files(without=["sunset"]), ["segments/a.mp4", "segments/c.mp4"])   # untagged stays in
             self.assertEqual(files(tags=["city"], without=["sunset"]), ["segments/a.mp4"])
             self.assertEqual(files(tags=["city"], only="sunset"), ["segments/b.mp4"])
+            # the figures of what plays are counted with the same filter, and exactly
+            figures = lambda **k: (db.stats(conn, **k)["clips"], db.stats(conn, **k)["tags"].get("sunset", 0))
+            self.assertEqual(figures(), (3, 1))
+            self.assertEqual(figures(only="sunset"), (1, 1))
+            self.assertEqual(figures(without=["sunset"]), (2, 0))
+            self.assertEqual(figures(tags=["city"], without=["sunset"]), (1, 0))
+            self.assertEqual(db.stats(conn, without=["sunset"])["sources"], 1)
+            self.assertEqual(db.stats(conn, tags=["%"])["clips"], 0)
             conn.execute("DELETE FROM sources")
+
+    def test_endpoints_pass_the_footage_on(self):
+        # the player always sends a seed; the endpoints are plain functions, called here as the server would
+        from corecore.app import clips_sample, stats
+        db.init()
+        with db.connect() as conn:
+            conn.execute("INSERT INTO sources (provider, external_id, title, status) VALUES ('local', 'ends', 't', 'done')")
+            sid = conn.execute("SELECT id FROM sources WHERE external_id = 'ends'").fetchone()["id"]
+            for f, tags in (("a", ",city,"), ("b", ",city,sunset,")):
+                conn.execute("INSERT INTO clips (source_id, file, duration, tags) VALUES (?, ?, 1, ?)", (sid, f"segments/{f}.mp4", tags))
+        try:
+            files = lambda **k: sorted(c["file"] for c in clips_sample(n=10, seed=3, **k)["clips"])
+            self.assertEqual(files(only="sunset"), ["segments/b.mp4"])
+            self.assertEqual(files(tags="city", without="sunset"), ["segments/a.mp4"])
+            self.assertEqual(files(tags="city"), ["segments/a.mp4", "segments/b.mp4"])
+            self.assertEqual(stats(only="sunset")["clips"], 1)
+            self.assertEqual(stats(without="sunset")["clips"], 1)
+            self.assertEqual(stats()["clips"], 2)
+        finally:
+            with db.connect() as conn:
+                conn.execute("DELETE FROM sources")
 
     def test_exclude_parsing_never_raises(self):
         from corecore.app import _parse_ids
@@ -533,6 +598,23 @@ class ContemporaryTest(unittest.TestCase):
             import importlib
             importlib.reload(archive)
 
+    def test_archive_skip_passes_over_items_without_moving_the_page(self):
+        from corecore.providers import archive
+        self.assertEqual(archive.split_directives("a AND b |sort=date desc |skip=x, y"), ("a AND b", {"sort": "date desc", "skip": "x, y"}))
+        self.assertEqual(archive.split_directives("a |skip=x |sort=date desc"), ("a", {"skip": "x", "sort": "date desc"}))
+        seen = {}
+        docs = [{"identifier": i, "title": f"sunset {i}"} for i in ("a", "b", "c", "d", "e", "f")]
+        archive._get_json = lambda url, timeout=60: (seen.setdefault("url", url), {"response": {"docs": docs, "numFound": 6}})[1]
+        try:
+            got = archive.ArchiveProvider().search("title:sunset |skip=b,c |sort=date desc", None, 2)
+            self.assertEqual([c.external_id for c in got], ["a", "d"])   # the next results on the same page
+            self.assertIn("rows=6", seen["url"])
+            self.assertNotIn("skip", urllib.parse.unquote_plus(seen["url"]))
+            self.assertIn("sort[]=date desc", urllib.parse.unquote_plus(seen["url"]))
+        finally:
+            import importlib
+            importlib.reload(archive)
+
     def test_pages_for_a_deeper_run(self):
         from corecore.jobs import parse_pages
         self.assertEqual(parse_pages("1,2,4"), ["1", "2", "4"])
@@ -573,7 +655,12 @@ class ContemporaryTest(unittest.TestCase):
         from corecore import seeds
         self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "internet", "twitter", "beauty", "sunset", "archival", "all"})
         # the sunset variation: tagged for its own export budget (sunset) and for CI's export filter (modern)
-        self.assertTrue(all({"sunset", "modern"} <= set(j["tags"]) for j in seeds.SUNSET_JOBS))
+        self.assertTrue(seeds.SUNSET_JOBS and all({"sunset", "modern"} <= set(j["tags"]) for j in seeds.SUNSET_JOBS))
+        from corecore.providers.archive import split_directives
+        for j in seeds.CONTEMPORARY_JOBS + seeds.ARCHIVAL_JOBS:   # the archive refuses longer queries, wrapper included
+            if j["provider"] == "archive" and j.get("query"):
+                q = split_directives(j["query"])[0]
+                self.assertLessEqual(len(q if "mediatype:" in q else f"({q}) AND mediatype:movies"), 2047, q[:80])
         self.assertTrue(all(j in seeds.CONTEMPORARY_JOBS for j in seeds.SUNSET_JOBS))
         self.assertFalse(any("sunset" in j["tags"] for j in seeds.CONTEMPORARY_JOBS if j not in seeds.SUNSET_JOBS))
         self.assertTrue(seeds.INTERNET_JOBS and all("modern" in j["tags"] and j["provider"] == "archive" for j in seeds.INTERNET_JOBS))

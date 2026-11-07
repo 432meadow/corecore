@@ -184,7 +184,7 @@ function swapStream() {
   sequencer.reseed(state.seed);
   player.snapEnabled = !state.live;
   if (state.started) applyMusic();
-  if (footage) refreshStats().then(drawStatus);   // the status line says if there are no sunsets yet
+  if (footage) refreshStats();   // and the status line says if there are no sunsets yet
 }
 
 function setSeed(seed, { live = false } = {}) {
@@ -252,6 +252,13 @@ async function refreshStats() {
   } catch (e) {
     $('#stats').textContent = STATIC ? 'the manifest would not load' : 'the server is not answering';
   }
+  // What plays changed under the stream: sunsets arrived while everything played for want of them, say. The
+  // catalog has emptied its pool for the new footage, and the stream fades over to it as a switch would.
+  if (catalog.turned) {
+    catalog.turned = false;
+    if (state.started) player.transition({ fastForward: state.live ? liveElapsed : 0, swap: swapStream });
+  }
+  drawStatus();
 }
 
 function fillCredits() {

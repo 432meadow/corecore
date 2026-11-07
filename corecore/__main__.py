@@ -31,8 +31,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", default="site")
     p.add_argument("--height", type=int, default=None, help="re-encode clips taller than this (default: copy as is)")
     p.add_argument("--max-mb", type=float, default=450, dest="max_mb")
-    p.add_argument("--sunset-mb", type=float, default=150, dest="sunset_mb", help="the sunset variation's own budget")
-    p.add_argument("--max-clips", type=int, default=2000, dest="max_clips")
+    p.add_argument("--sunset-mb", type=float, default=150, dest="sunset_mb", help="the sunset variation's own budget in MB, on top of --max-mb")
+    p.add_argument("--max-clips", type=int, default=2000, dest="max_clips",
+                   help="the most clips in each footage: the main mix, and the sunsets on top of it")
     p.add_argument("--tags", default="", help="export only clips with at least one of these comma-separated tags")
 
     p = sub.add_parser("build-site", help="scrape the starter list within a time budget, then export (what CI runs)")
@@ -40,8 +41,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--time-budget", type=float, default=1500, dest="time_budget", help="seconds of scraping before export")
     p.add_argument("--height", type=int, default=None)
     p.add_argument("--max-mb", type=float, default=450, dest="max_mb")
-    p.add_argument("--sunset-mb", type=float, default=150, dest="sunset_mb", help="the sunset variation's own budget")
-    p.add_argument("--max-clips", type=int, default=2000, dest="max_clips")
+    p.add_argument("--sunset-mb", type=float, default=150, dest="sunset_mb", help="the sunset variation's own budget in MB, on top of --max-mb")
+    p.add_argument("--max-clips", type=int, default=2000, dest="max_clips",
+                   help="the most clips in each footage: the main mix, and the sunsets on top of it")
     p.add_argument("--skip-ingest", action="store_true", dest="skip_ingest")
     p.add_argument("--set", default="contemporary", choices=["contemporary", "internet", "twitter", "beauty", "sunset", "archival", "all"], dest="seed_set")
     p.add_argument("--tags", default="", help="export only clips with at least one of these comma-separated tags")

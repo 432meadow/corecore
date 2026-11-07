@@ -33,6 +33,14 @@ def auto_tags(stats: dict, info: dict, loud: float | None) -> list[str]:
     return [t for t in tags if t]
 
 
+def keep_footage(tags: list[str], stored: list[str]) -> list[str]:
+    """A job picking up a source that was left unfinished or failed keeps it in the footage it was first found for
+    (the sunset variation, or the main mix), whatever its own tags say, so a time budget running out mid-source
+    never moves footage from one into the other. Its other tags are the new job's."""
+    rest = [t for t in tags if t != db.SUNSET]
+    return [db.SUNSET, *rest] if db.SUNSET in stored else rest
+
+
 def ingest_candidate(cand: Candidate, tags: list[str], *, query: str = "", logger: Logger = log.info,
                      should_cancel: Callable[[], bool] = lambda: False) -> int:
     """Download, detect shots, cut clips, compute stats, store. Returns the number of clips added."""
@@ -40,13 +48,14 @@ def ingest_candidate(cand: Candidate, tags: list[str], *, query: str = "", logge
     provider = get_provider(cand.provider)
     conn = db.connect()
     try:
-        row = conn.execute("SELECT id, status FROM sources WHERE provider = ? AND external_id = ?",
+        row = conn.execute("SELECT id, status, tags FROM sources WHERE provider = ? AND external_id = ?",
                            (cand.provider, cand.external_id)).fetchone()
         if row and row["status"] == "done":
             logger(f"skip (already ingested): {cand.title or cand.external_id}")
             return 0
         if row:
             source_id = row["id"]
+            tags = keep_footage(tags, db.tags_from_db(row["tags"]))
             conn.execute("UPDATE sources SET status = 'pending', error = NULL, query = ?, tags = ? WHERE id = ?",
                          (query, db.tags_to_db(tags), source_id))
             conn.execute("DELETE FROM clips WHERE source_id = ?", (source_id,))

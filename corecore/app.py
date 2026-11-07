@@ -49,10 +49,15 @@ def health():
     return {"ok": True, "version": "0.1.0"}
 
 
+def _tag_list(raw: str | None) -> list[str] | None:
+    return [t for t in (raw or "").split(",") if t.strip()] or None
+
+
 @app.get("/api/stats")
-def stats():
+def stats(tags: str | None = None, only: str | None = None, without: str | None = None):
+    """The pool's figures; with the filters /api/clips/sample takes, the figures of what they let through."""
     with db.connect() as conn:
-        return db.stats(conn)
+        return db.stats(conn, tags=_tag_list(tags), only=(only or "").strip() or None, without=_tag_list(without))
 
 
 def _parse_ids(raw: str | None) -> list[int] | None:
@@ -70,11 +75,9 @@ def _parse_ids(raw: str | None) -> list[int] | None:
 @app.get("/api/clips/sample")
 def clips_sample(n: int = Query(100, ge=1, le=500), tags: str | None = None, exclude: str | None = None,
                  seed: int | None = None, only: str | None = None, without: str | None = None):
-    tag_list = [t for t in (tags or "").split(",") if t.strip()] or None
-    excl = _parse_ids(exclude)
     with db.connect() as conn:
-        rows = db.sample_clips(conn, n=n, tags=tag_list, exclude=excl, seed=seed, only=(only or "").strip() or None,
-                               without=[t for t in (without or "").split(",") if t.strip()] or None)
+        rows = db.sample_clips(conn, n=n, tags=_tag_list(tags), exclude=_parse_ids(exclude), seed=seed,
+                               only=(only or "").strip() or None, without=_tag_list(without))
         return {"clips": [db.clip_to_dict(r) for r in rows]}
 
 

@@ -157,7 +157,8 @@ sunsets are a set of their own (`--set sunset`), scraped from the same mirrors a
 export gives them a budget of their own (`--sunset-mb`, 150 MB in CI) on top of the main mix's, which leaves
 them out, so everything stays as it was. Another footage is another stream, with the same fade as a new seed,
 and the address carries it (`?footage=sunset`), so a link or the live channel gives everyone the same edit.
-Until sunsets are published the stream plays everything, and the status line says so.
+Until sunsets are published the stream plays everything, and the status line says so. A source stays in the
+footage it was first found for, even when the time budget stops it half cut and another job finishes it.
 
 **Between streams.** A new seed (or the live channel) does not cut: the picture fades out to the page over
 half a second and the sound with it, a full second of silence on the empty page, then the new stream fades
@@ -220,13 +221,16 @@ controls queue the contemporary, beauty and archival ones):
   dashcams, vlogs, walking tours, driving POVs, doorbell and CCTV clips, game moments, pets, raw footage,
   ASMR. The queries use quoted phrases (the archive's search treats `dash cam` as dash OR cam), newest-first
   ordering (`|sort=date desc` on any archive query) and a title blocklist (`CORECORE_BLOCKLIST`) that drops
-  adult and gore uploads, which otherwise dominate the popular end of that collection.
+  adult and gore uploads, which otherwise dominate the popular end of that collection. `|skip=id1,id2` passes
+  over items that were looked at and found wanting, without moving the result pages the way a `NOT` would.
 - **internet** (inside the contemporary set too): its social half, for runs that want more of it: the
   TikTok, Twitter and Periscope mirrors, vlogs, phone clips, CCTV, weird happenings. **twitter** is its
   Twitter and Periscope part.
 - **sunset** (inside the contemporary set too): the footage of `[ sunsets ]`, suns going down over sea,
-  fields and cities, golden hour, dusk skies, filmed by people. Tagged `sunset`, so the export publishes it
-  within its own budget and the main mix leaves it out.
+  fields and cities, golden hour, dusk skies, filmed by people: Flickr's time-lapses and real-time clips,
+  stock and park-service footage, the YouTube, TikTok, Instagram, Twitter and Periscope mirrors. Ten queries,
+  each rated twice by readers on different result pages, with every item CI's page rotation takes looked at.
+  Tagged `sunset`, so the export publishes it within its own budget and the main mix leaves it out.
 - **archival**: the Prelinger ephemeral films, NASA and other public-domain footage. Legally the cleanest
   pool. The public GitHub Pages build scrapes the contemporary set and exports only clips tagged `modern`;
   its `seed_set` workflow input switches it.
@@ -292,7 +296,7 @@ Environment variables, all optional:
 
 | method and path | what |
 | --- | --- |
-| `GET /api/stats` | clip, source and tag counts |
+| `GET /api/stats?tags=&only=&without=` | clip, source and tag counts; with the sample's filters, those of what they let through |
 | `GET /api/clips/sample?n=&seed=&tags=&only=&without=&exclude=` | random window of playable clips (seeded order); `tags` any of, `only` this one too, `without` none of |
 | `GET /api/clips?offset=&limit=&tag=` | browse newest first |
 | `POST /api/clips/{id}/ban` (`?undo=1`) | remove from / restore to the pool |

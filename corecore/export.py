@@ -51,7 +51,7 @@ def select_clips(rows: list, media_dir: Path, max_bytes: int, max_clips: int) ->
 
 # Clips scraped for the sunset variation carry this tag. They are published within a budget of their own, so the
 # variation has its footage without the sunsets crowding the main mix (which leans on nature easily enough).
-SUNSET = "sunset"
+SUNSET = db.SUNSET
 
 
 def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 1024 * 1024, max_clips: int = 2000,
