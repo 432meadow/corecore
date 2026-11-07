@@ -70,3 +70,26 @@ archive:Flickr-26626183039@0.08       # a title over the opening
 archive:Flickr-15226347179@16.19      # a title fades in
 archive:youtube--TcyfUI9yUQ@0.16       # half black
 archive:youtube--TWPPWjRuuo@95.9       # black at the end
+
+# The sunsets brought in after those bans, checked the same way. A third cut of one shot is left to the cap of
+# two clips a source; only what is wrong in itself is banned.
+
+archive:youtube-ttAWmLslIk8                 # a fast-cut phone compilation: whip pans and hard cuts
+archive:youtube-hqlSOtHZPQs                 # the same compilation's shots, fast cut again
+archive:Flickr-44157309925@19.88      # fades to black at the end
+archive:Flickr-36462426874@48.3       # night throughout
+archive:Flickr-28517184287@0.08       # a handwritten title over the opening
+archive:SunriseTimeLapse@62.49        # a light-leak glitch, then black
+archive:twitter-1423238776344629264@50.93   # black but for a thin line of the Earth's edge
+archive:periscope-1LyxBakMAnoJN@532.66      # rocks under a white sky, frozen at first
+archive:periscope-1djGXoDLnlLKZ@739.89      # blue sea and sky, no sunset light
+archive:Flickr-8005283667@102.06      # mostly black, late dusk
+archive:Flickr-29975934484@0.08       # a title card
+archive:Flickr-27750381860@0.08       # a pool deck, then a grey sky
+archive:SunsetTimeLapseCCBYNatureClip@73.33 # an end card and a logo
+archive:Flickr-5386751806@0.08        # night
+archive:Flickr-10509848943@0.08       # fades in from black, then a grey city
+archive:Flickr-10509848943@21.75      # a grey city, then a fade to black
+archive:youtube--TWPPWjRuuo@0.08      # grey fog, no sunset light
+archive:Flickr-40248624150@51.92      # dusk into night, then black
+archive:Flickr-26626183039@34.48      # night clouds lit by a town's glow
