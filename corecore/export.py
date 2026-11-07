@@ -130,6 +130,18 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
             except (ffmpeg.FFmpegError, OSError) as e:
                 log(f"skip {name}: {e}")
                 continue
+            # a clip whose picture stops before its sound would freeze on its last frame: it plays to its picture's end
+            try:
+                fitted = ffmpeg.fit_to_picture(dst)
+                if fitted["trimmed"] and fitted["duration"] < config.MIN_SHOT:
+                    raise ffmpeg.FFmpegError(f"only {fitted['duration']:.1f}s of picture")
+            except (ffmpeg.FFmpegError, OSError) as e:
+                dst.unlink(missing_ok=True)
+                log(f"skip {name}: {e}")
+                continue
+            duration = round(fitted["duration"], 3) if fitted["trimmed"] else r["duration"]
+            if fitted["trimmed"]:
+                log(f"{name}: its picture ends at {duration:.1f}s, so the clip does too")
             size = dst.stat().st_size
             if spent + size > budget:
                 dst.unlink(missing_ok=True)
@@ -145,7 +157,7 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
             used_sources.add(r["source_id"])
             manifest_clips.append({
                 "id": r["id"], "source_id": r["source_id"], "file": f"clips/{name}", "thumb": thumb,
-                "duration": r["duration"], "width": r["width"], "height": r["height"], "has_audio": bool(r["has_audio"]),
+                "duration": duration, "width": r["width"], "height": r["height"], "has_audio": bool(r["has_audio"]),
                 "brightness": r["brightness"], "saturation": r["saturation"], "motion": r["motion"], "loudness": r["loudness"],
                 "faces": r.get("faces") or 0, "tags": db.tags_from_db(r["tags"]),
                 "start": round(r["start"], 2) if r.get("start") is not None else None,

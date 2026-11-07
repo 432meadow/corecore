@@ -37,6 +37,16 @@ def probe(path: Path | str) -> dict:
     if video is None:
         raise FFmpegError("no video stream")
     duration = float(info.get("format", {}).get("duration") or video.get("duration") or 0.0)
+    # where the picture ends: a cut from a stream that stalled can hold less picture than sound (mp4 gives the
+    # stream's duration; webm only a DURATION tag, as h:mm:ss.fraction)
+    try:
+        length = video.get("duration")
+        if length is None:
+            h, m, s = (video.get("tags") or {}).get("DURATION", "").split(":")
+            length = int(h) * 3600 + int(m) * 60 + float(s)
+        picture = float(video.get("start_time") or 0.0) + float(length)
+    except (TypeError, ValueError):
+        picture = duration
     fps = 0.0
     rate = video.get("avg_frame_rate") or video.get("r_frame_rate") or "0/1"
     try:
@@ -46,6 +56,7 @@ def probe(path: Path | str) -> dict:
         pass
     return {
         "duration": duration,
+        "picture_end": min(picture, duration) if picture > 0 else duration,
         "width": int(video.get("width") or 0),
         "height": int(video.get("height") or 0),
         "fps": fps,
@@ -119,6 +130,31 @@ def cut_segment(src: Path | str, start: float, length: float, out: Path | str, *
         args += ["-c:a", "aac", "-b:a", "96k", "-ac", "2"] if has_audio else ["-an"]
     args += [str(out)]
     _run(args, timeout=600, capture_stdout=False)
+
+
+# More sound than picture by this much, and a clip is trimmed to its picture.
+PICTURE_SLACK = 0.5
+
+
+def fit_to_picture(path: Path | str, info: dict | None = None) -> dict:
+    """A cut from a stream that stalled can stop its picture early while the sound runs on, and a player then holds
+    the last frame, frozen, to the end. Trim such a file where its picture ends (a stream copy: nothing is
+    re-encoded) and return its probe, with "trimmed" set; a file whose picture runs to its end is left as it is."""
+    path = Path(path)
+    info = info or probe(path)
+    if info["duration"] - info["picture_end"] <= PICTURE_SLACK:
+        return {**info, "trimmed": False}
+    tmp = path.with_name(f"{path.stem}.fit{path.suffix}")
+    args = [config.FFMPEG, "-y", "-hide_banner", "-loglevel", "error", "-nostats", "-i", str(path),
+            "-t", f"{info['picture_end']:.3f}", "-map", "0", "-c", "copy"]
+    if path.suffix.lower() in (".mp4", ".mov", ".m4v"):
+        args += ["-movflags", "+faststart"]
+    try:
+        _run(args + [str(tmp)], timeout=120, capture_stdout=False)
+        tmp.replace(path)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return {**probe(path), "trimmed": True}
 
 
 def transcode(src: Path | str, out: Path | str, *, height: int, crf: int = 27, has_audio: bool = True) -> None:

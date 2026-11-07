@@ -90,7 +90,9 @@ def ingest_candidate(cand: Candidate, tags: list[str], *, query: str = "", logge
                 thumb = config.THUMBS_DIR / f"{stem}.jpg"
                 try:
                     ffmpeg.cut_segment(path, start, length, seg, has_audio=info["has_audio"])
-                    seg_info = ffmpeg.probe(seg)
+                    seg_info = ffmpeg.fit_to_picture(seg)
+                    if seg_info["trimmed"] and seg_info["duration"] < config.MIN_SHOT:
+                        raise ffmpeg.FFmpegError(f"only {seg_info['duration']:.1f}s of picture")
                     ffmpeg.thumbnail(seg, min(0.5, max(0.0, seg_info["duration"] / 2)), thumb)
                     stats = ffmpeg.frame_stats(seg)
                     loud = ffmpeg.loudness(seg) if seg_info["has_audio"] else None

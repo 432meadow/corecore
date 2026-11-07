@@ -62,7 +62,7 @@ budget, size budget, the sunsets' size budget, set, pages), or let the Monday sc
 
 ```
 providers (archive | ytdlp | local)
-   └─ download ──► ffmpeg shot detection ──► 1.2–8 s clips at 720p (h264/aac, faststart)
+   └─ download ──► ffmpeg shot detection ──► 1.2–8 s clips at 720p (h264/aac, faststart), each ending with its picture
                                                └─ thumbnail, brightness / saturation / motion / loudness
                                                   └─ SQLite catalogue (media/corecore.sqlite3)
                                                         │  /api/clips/sample  (seeded random window)

@@ -123,6 +123,26 @@ class FfmpegRoundTrip(unittest.TestCase):
             ffmpeg.thumbnail(out, 0.5, thumb)
             self.assertGreater(thumb.stat().st_size, 500)
 
+    def test_a_cut_whose_picture_stops_is_trimmed_to_it(self):
+        # a stream that stalled: 2 s of picture under 5 s of sound, so a cut from 0.5 s holds 1.5 s of picture
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "stall.mp4"
+            _stalled_video(src, picture=2, sound=5)
+            out = Path(d) / "clip.mp4"
+            ffmpeg.cut_segment(src, 0.5, 4.0, out, height=90)
+            cut = ffmpeg.probe(out)
+            self.assertAlmostEqual(cut["duration"], 4.0, delta=0.15)
+            self.assertAlmostEqual(cut["picture_end"], 1.5, delta=0.15)
+            fitted = ffmpeg.fit_to_picture(out)
+            self.assertTrue(fitted["trimmed"])
+            self.assertAlmostEqual(fitted["duration"], 1.5, delta=0.15)
+            self.assertTrue(fitted["has_audio"])
+            self.assertEqual(list(Path(d).glob("*.fit.*")), [])
+            self.assertFalse(ffmpeg.fit_to_picture(out)["trimmed"])   # a clip that plays to its end is left alone
+            whole = Path(d) / "whole.mp4"
+            ffmpeg.cut_segment(src, 0.0, 1.5, whole, height=90)
+            self.assertFalse(ffmpeg.fit_to_picture(whole)["trimmed"])
+
 
 class HardBlockTest(unittest.TestCase):
     def test_hard_blocklist(self):
@@ -269,6 +289,34 @@ class ExportTest(unittest.TestCase):
         finally:
             config.BANS = saved
 
+    def test_a_clip_whose_picture_stops_plays_to_its_picture(self):
+        # clips cut before the fix: one with 2 s of picture in a 5 s file is trimmed to it, one with half a second of
+        # picture is left out, and a whole one is published as it was
+        from corecore.export import export_site
+        db.init()
+        with db.connect() as conn:
+            conn.execute("DELETE FROM sources")
+            conn.execute("INSERT INTO sources (provider, external_id, url, title, status, tags) VALUES "
+                         "('archive', 'periscope-1', 'https://archive.org/details/periscope-1', 'a river at dusk', 'done', ',modern,')")
+            sid = conn.execute("SELECT id FROM sources WHERE external_id = 'periscope-1'").fetchone()["id"]
+            for name, picture in (("stall_long", 2), ("stall_short", 0.5), ("stall_none", 5)):
+                _stalled_video(config.SEGMENTS_DIR / f"{name}.mp4", picture=picture, sound=5)
+                conn.execute("INSERT INTO clips (source_id, file, start, duration, width, height, has_audio, tags) VALUES "
+                             "(?, ?, 0.0, 5.0, 160, 90, 1, ',modern,')", (sid, f"segments/{name}.mp4"))
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "site"
+            lines = []
+            self.assertEqual(export_site(out, log=lines.append)["clips"], 2)
+            durations = {c["file"]: c["duration"] for c in json.loads((out / "manifest.json").read_text())["clips"]}
+            self.assertEqual(sorted(durations), ["clips/stall_long.mp4", "clips/stall_none.mp4"])
+            self.assertAlmostEqual(durations["clips/stall_long.mp4"], 2.0, delta=0.15)
+            self.assertEqual(durations["clips/stall_none.mp4"], 5.0)
+            self.assertAlmostEqual(ffmpeg.probe(out / "clips" / "stall_long.mp4")["duration"], 2.0, delta=0.15)
+            self.assertFalse((out / "clips" / "stall_short.mp4").exists())
+            self.assertTrue(any("stall_short" in x and "picture" in x for x in lines), lines)
+        with db.connect() as conn:
+            conn.execute("DELETE FROM sources")
+
     def test_export_site_writes_manifest(self):
         from corecore.export import export_site
         db.init()
@@ -369,6 +417,13 @@ class StarterBudgetTest(unittest.TestCase):
                 with db.connect() as conn:
                     conn.execute("DELETE FROM sources")
                     conn.execute("DELETE FROM jobs")
+
+
+def _stalled_video(path: Path, picture: float, sound: float) -> None:
+    """A file whose picture stops while its sound runs on, as a cut from a stalled stream does."""
+    subprocess.run([config.FFMPEG, "-y", "-loglevel", "error", "-f", "lavfi", "-i", f"testsrc2=s=160x90:r=10:d={picture}",
+                    "-f", "lavfi", "-i", f"sine=frequency=440:duration={sound}", "-c:v", "libx264", "-preset", "ultrafast",
+                    "-c:a", "aac", str(path)], check=True)
 
 
 def _tiny_video(path: Path, seconds: int = 3) -> None:
