@@ -443,7 +443,7 @@ function wire() {
   // the way in on a phone, which has no keys
   canvas.addEventListener('click', () => { if (state.started) setHud($('#hud').classList.contains('hidden')); });
   if (PHONE) UPRIGHT.addEventListener('change', () => { if (!state.aspectChosen) setAspect(defaultAspect(), { chosen: false }); });
-  if (matchMedia('(pointer: coarse)').matches) $('#hint').textContent = 'tap the picture for the controls. sound on.';
+  if (matchMedia('(pointer: coarse)').matches) $('#hint').textContent = 'tap the picture for the controls.';
   $('#pause').addEventListener('click', togglePause);
   $('#splash').addEventListener('click', (e) => { if (e.target.id !== 'start') start(); });
   $('#reseed').addEventListener('click', () => setSeed(randomSeed()));
