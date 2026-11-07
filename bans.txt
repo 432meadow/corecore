@@ -6,3 +6,67 @@
 #   archive:tiktok-7130942596586818818          a line without @: every clip of that source
 #
 # Anything after a # is a note.
+
+# The sunsets, checked clip by clip on 2026-11-07 (frames, black and freeze detection): left out for text over
+# the picture, night or black, flat daylight, frozen frames and near duplicates. Small corner credits stay.
+
+archive:Flickr-13807668515                  # a title card on black, then black
+archive:Flickr-41682950181                  # a handwritten title, then the Milky Way at night
+archive:Flickr-25890930607                  # a caption line across the bottom throughout
+archive:Flickr-14016570624                  # a title card on black, and a fade to black
+archive:Flickr-17239746492                  # frozen: one still frame
+archive:Instagram-0c0rmOuuLU                # an Instagram repost badge throughout
+archive:Instagram-BRtRIDdgKj2               # an airline's apron in daylight, its livery large
+archive:youtube-579uhtYq7BU                 # a vlog: a woman posing and waving in front of the sunset
+archive:youtube-gs8HjDhvWNc                 # a camera date stamp, and night and grey dawn
+archive:youtube-kTd_qSETMx4                 # a title card, then a slideshow of still photos
+archive:youtube-Ifp1N8fJ5ow                 # a VHS timecode across the picture, tape glitches
+archive:youtube-Dkx4LYeFnVY                 # the same NatureClip sunset as another source
+archive:youtube-zZaje_dNatU                 # the same NatureClip sunset again, nearly frozen
+archive:twitter-1314547436837191680         # the ISS over black space and a daylit Earth
+archive:twitter-1441354493640118282         # a phone-photography tip reel: hands, the camera app
+archive:twitter-1404384887642083329         # the Burj Khalifa in foggy daylight
+archive:periscope-1eaKbzMpZvZKX             # a selfie stream: a young woman's chest framed, no sunset
+archive:TikTok-7281346536414481695          # a caption throughout
+archive:TikTok-7012333813367835910          # a caption over a bedroom, then still interiors
+archive:TikTok-6999208035918875905          # a family's video of an identifiable child, captioned
+
+archive:Flickr-8661965788@52.08      # the Grand Canyon in afternoon light
+archive:Flickr-27480521538@0.08       # a title over the opening
+archive:Flickr-44157309925@0.08       # a title over the opening
+archive:Flickr-36462426874@39.71      # the Milky Way at night
+archive:Flickr-33909747000@0.08       # the Milky Way at night, and a title
+archive:Flickr-33909747000@10.15      # night, then a faint dawn
+archive:TikTok-7059787717688773894@0.08       # a caption over the opening
+archive:TikTok-7059044846543179014@0.08       # a caption over the opening
+archive:TikTok-6975967106529594630@0.08       # legs in a meadow, in daylight
+archive:TikTok-6964411237471915270@4.48       # a still blue sky
+archive:youtube-mRs1qYuLlZA@0.08       # a drone on a balcony
+archive:Flickr-40265235921@0.08       # a beach in afternoon light
+archive:Instagram-CbeTSHkl5hG@30.79      # a third cut of one shot
+archive:Instagram-CbSmMz8F78T@14.38      # an end card
+archive:Instagram-B_Vp0nvJRux@9.82       # a dark cockpit panel
+archive:SunriseTimeLapse@41.69      # a third cut of one shot
+archive:C.E.PriceVividSunrise@23.48      # bright daylight
+archive:TimeLapseSunsetCapeTownAfrica@14.36      # half black
+archive:youtube-5iIR-vCXYOk@0.08       # a title on black
+archive:youtube-HNY0YivMKtw@0.08       # a large title
+archive:youtube-HNY0YivMKtw@38.8       # black, then an end card
+archive:youtube-P4_IP-nrvBU@29.54      # grey dusk into night
+archive:Flickr-15854302211@0.08       # black at the end
+archive:twitter-1423238776344629264@0.08       # the daylit Earth from orbit
+archive:Flickr-36231440252@0.08       # a title and music credit
+archive:Flickr-12453031005@0.08       # afternoon light
+archive:Flickr-30384762925@0.08       # a title card
+archive:Flickr-29190601274@18.05      # black at the end
+archive:Flickr-27750381860@118.01     # frozen
+archive:Flickr-27625944476@0.08       # an overcast afternoon
+archive:SunsetTimeLapseCCBYNatureClip@48.92      # black
+archive:Flickr-10329114023@23.54      # night
+archive:Flickr-10509848943@10.91      # an overcast day
+archive:Flickr-7821693974@0.08       # blown out
+archive:Flickr-9291003088@45.17      # night
+archive:Flickr-26626183039@0.08       # a title over the opening
+archive:Flickr-15226347179@16.19      # a title fades in
+archive:youtube--TcyfUI9yUQ@0.16       # half black
+archive:youtube--TWPPWjRuuo@95.9       # black at the end
