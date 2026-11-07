@@ -93,3 +93,14 @@ archive:Flickr-10509848943@21.75      # a grey city, then a fade to black
 archive:youtube--TWPPWjRuuo@0.08      # grey fog, no sunset light
 archive:Flickr-40248624150@51.92      # dusk into night, then black
 archive:Flickr-26626183039@34.48      # night clouds lit by a town's glow
+
+# And those the last bans brought in, checked the same way.
+
+archive:Flickr-36462426874@0.08       # a handwritten title over the opening
+archive:Flickr-36462426874@22.54      # the Milky Way at night
+archive:Flickr-36462426874@31.12      # the Milky Way at night
+archive:Flickr-5386751806@13.79       # night
+archive:Flickr-29975934484@30.59      # an end card
+archive:SunsetTimeLapseCCBYNatureClip@24.5  # black throughout
+archive:periscope-1djGXoDLnlLKZ@369.98      # the picture on its side
+archive:periscope-1LyxBakMAnoJN@833.0       # a frozen opening, the stream stalled
