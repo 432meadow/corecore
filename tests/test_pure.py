@@ -223,10 +223,6 @@ class HardBlockTest(unittest.TestCase):
             conn.execute("DELETE FROM sources")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class ExportTest(unittest.TestCase):
     def test_select_clips_round_robin_and_budget(self):
         from corecore.export import select_clips
@@ -467,6 +463,31 @@ class ReviewRegressionTest(unittest.TestCase):
                 row = conn.execute("SELECT status FROM sources WHERE external_id = ?", (str(src),)).fetchone()
                 self.assertEqual(row["status"], "done")
                 conn.execute("DELETE FROM sources")
+
+    def test_a_stalled_source_is_cut_to_its_picture(self):
+        # a stream whose picture stops while its sound runs on: the cut over the stall ends with its picture and the
+        # catalogue holds that length; a cut left with less than a shot of picture is not kept
+        from corecore.ingest import ingest_candidate
+        from corecore.providers import Candidate
+        db.init()
+        with tempfile.TemporaryDirectory() as d:
+            try:
+                for name, picture, kept in (("stall", 3, 1), ("blink", 0.6, 0)):
+                    src = Path(d) / f"{name}.mp4"
+                    _stalled_video(src, picture=picture, sound=12)
+                    cand = Candidate("local", str(src), src.as_uri(), title=name, extra={"keep": True})
+                    self.assertEqual(ingest_candidate(cand, ["t"], logger=lambda m: None), kept, name)
+                with db.connect() as conn:
+                    rows = conn.execute("SELECT c.file, c.duration FROM clips c JOIN sources s ON s.id = c.source_id "
+                                        "WHERE s.title = 'stall'").fetchall()
+                self.assertEqual(len(rows), 1)
+                self.assertAlmostEqual(rows[0]["duration"], 2.92, delta=0.15)
+                clip = ffmpeg.probe(config.MEDIA_DIR / rows[0]["file"])
+                self.assertAlmostEqual(clip["duration"], rows[0]["duration"], delta=0.01)
+                self.assertLessEqual(clip["duration"] - clip["picture_end"], ffmpeg.PICTURE_SLACK)
+            finally:
+                with db.connect() as conn:
+                    conn.execute("DELETE FROM sources")
 
     def test_an_unfinished_source_keeps_its_footage(self):
         from corecore.ingest import ingest_candidate, keep_footage
@@ -753,3 +774,7 @@ class NewProvidersTest(unittest.TestCase):
         self.assertEqual([c.external_id for c in cands], ["a"])
         self.assertEqual(cands[0].extra["video"], "https://v.redd.it/abc/DASH_720.mp4")
         self.assertEqual(cands[0].uploader, "r/dashcam")
+
+
+if __name__ == "__main__":
+    unittest.main()

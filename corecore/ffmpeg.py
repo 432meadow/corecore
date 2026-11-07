@@ -139,7 +139,9 @@ PICTURE_SLACK = 0.5
 def fit_to_picture(path: Path | str, info: dict | None = None) -> dict:
     """A cut from a stream that stalled can stop its picture early while the sound runs on, and a player then holds
     the last frame, frozen, to the end. Trim such a file where its picture ends (a stream copy: nothing is
-    re-encoded) and return its probe, with "trimmed" set; a file whose picture runs to its end is left as it is."""
+    re-encoded) and return its probe, with "trimmed" set; a file whose picture runs to its end is left as it is.
+    A stall the stream recovers from inside the cut is another matter: cut_segment's constant frame rate fills it
+    with copies of the frame before it, so the picture runs to the end and this cannot see the freeze."""
     path = Path(path)
     info = info or probe(path)
     if info["duration"] - info["picture_end"] <= PICTURE_SLACK:
