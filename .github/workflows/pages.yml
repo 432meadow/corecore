@@ -11,10 +11,13 @@ on:
         description: seconds to spend scraping before exporting
         default: "2400"
       max_mb:
-        description: size budget of the exported site in MB
+        description: size budget of the exported site in MB (the main mix)
         default: "600"
+      sunset_mb:
+        description: the sunset footage's own budget in MB, on top of max_mb
+        default: "150"
       seed_set:
-        description: "which starter set to scrape: contemporary (mirrored web video), internet (social clips, weird happenings, vlogs), twitter (its Twitter part), beauty, archival (public domain), all"
+        description: "which starter set to scrape: contemporary (mirrored web video), internet (social clips, weird happenings, vlogs), twitter (its Twitter part), beauty, sunset (the sunset footage), archival (public domain), all"
         default: "contemporary"
       archive_pages:
         description: "result pages to take in turn, e.g. 1,2,4 (empty: this week's page)"
@@ -102,7 +105,7 @@ jobs:
           esac
           python -m corecore build-site --out site --set "$SET" $TAGS \
             --time-budget "$BUDGET" --min-clips 200 --fallback-budget 1500 --pages "${{ github.event.inputs.archive_pages || '' }}" \
-            --max-mb "${{ github.event.inputs.max_mb || '600' }}"
+            --max-mb "${{ github.event.inputs.max_mb || '600' }}" --sunset-mb "${{ github.event.inputs.sunset_mb || '150' }}"
           python -m corecore stats
           du -sh site
 

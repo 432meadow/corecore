@@ -119,9 +119,11 @@ def tag_like(tag: str) -> str | None:
 
 
 def sample_clips(conn: sqlite3.Connection, n: int = 100, tags: list[str] | None = None,
-                 exclude: list[int] | None = None, seed: int | None = None) -> list[sqlite3.Row]:
+                 exclude: list[int] | None = None, seed: int | None = None, only: str | None = None,
+                 without: list[str] | None = None) -> list[sqlite3.Row]:
     """Random sample of playable clips, joined with their source. A seed makes the order repeatable
-    over an unchanged pool (a seeded shuffle of the matching ids)."""
+    over an unchanged pool (a seeded shuffle of the matching ids). `tags`: carrying any of these; `only`:
+    carrying this one as well; `without`: carrying none of these."""
     where = ["c.banned = 0"]
     params: list = []
     if tags:
@@ -130,6 +132,15 @@ def sample_clips(conn: sqlite3.Connection, n: int = 100, tags: list[str] | None 
             return []
         where.append("(" + " OR ".join("c.tags LIKE ? ESCAPE '\\'" for _ in patterns) + ")")
         params.extend(patterns)
+    if only:
+        pattern = tag_like(only)
+        if not pattern:
+            return []
+        where.append("c.tags LIKE ? ESCAPE '\\'")
+        params.append(pattern)
+    for pattern in [p for p in (tag_like(t) for t in (without or [])) if p]:
+        where.append("COALESCE(c.tags, '') NOT LIKE ? ESCAPE '\\'")   # NULL NOT LIKE is NULL: keep untagged clips
+        params.append(pattern)
     if exclude:
         exclude = [int(x) for x in exclude][:2000]
         where.append(f"c.id NOT IN ({','.join('?' * len(exclude))})")

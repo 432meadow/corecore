@@ -307,6 +307,35 @@ class ExportTest(unittest.TestCase):
         with db.connect() as conn:
             conn.execute("DELETE FROM sources")
 
+    def test_sunsets_have_a_budget_of_their_own(self):
+        from corecore.export import export_site
+        db.init()
+        with db.connect() as conn:
+            conn.execute("DELETE FROM sources")
+            for ext, tags in (("tiktok-2", ",modern,vlog,"), ("sunset-1", ",modern,sunset,light,")):
+                conn.execute("INSERT INTO sources (provider, external_id, url, title, status, tags) VALUES "
+                             "('archive', ?, 'https://archive.org/details/x', 'a clip', 'done', ?)", (ext, tags))
+                sid = conn.execute("SELECT id FROM sources WHERE external_id = ?", (ext,)).fetchone()["id"]
+                seg = config.SEGMENTS_DIR / f"{ext}.mp4"
+                subprocess.run([config.FFMPEG, "-y", "-loglevel", "error", "-t", "1", "-f", "lavfi", "-i", "testsrc=s=160x90:r=10",
+                                "-c:v", "libx264", "-preset", "ultrafast", str(seg)], check=True)
+                conn.execute("INSERT INTO clips (source_id, file, duration, width, height, has_audio, tags) VALUES "
+                             "(?, ?, 1.0, 160, 90, 0, ?)", (sid, f"segments/{ext}.mp4", tags))
+        quiet = lambda m: None
+        with tempfile.TemporaryDirectory() as d:
+            both = export_site(Path(d) / "both", log=quiet)
+            self.assertEqual((both["clips"], both["sunset_clips"]), (2, 1))
+            tags = sorted(sorted(c["tags"]) for c in json.loads((Path(d) / "both" / "manifest.json").read_text())["clips"])
+            self.assertEqual(tags, [["light", "modern", "sunset"], ["modern", "vlog"]])
+            # the main budget is not spent on sunsets, and the sunset budget is not spent on the main mix
+            self.assertEqual(export_site(Path(d) / "main", sunset_bytes=0, log=quiet)["sunset_clips"], 0)
+            self.assertEqual(export_site(Path(d) / "main", sunset_bytes=0, log=quiet)["clips"], 1)
+            sun = export_site(Path(d) / "sun", max_bytes=0, log=quiet)
+            self.assertEqual((sun["clips"], sun["sunset_clips"]), (1, 1))
+            self.assertEqual(export_site(Path(d) / "tagged", tags=["modern"], log=quiet)["clips"], 2)
+        with db.connect() as conn:
+            conn.execute("DELETE FROM sources")
+
 
 class StarterBudgetTest(unittest.TestCase):
     def test_run_starter_jobs_respects_time_budget(self):
@@ -385,6 +414,20 @@ class ReviewRegressionTest(unittest.TestCase):
             self.assertEqual(len(db.sample_clips(conn, n=10, tags=["cit_"])), 0)
             self.assertEqual(len(db.sample_clips(conn, n=10, tags=["City"])), 1)
             self.assertEqual(db.tag_like("a_b%"), "%,a\\_b\\%,%")
+            conn.execute("DELETE FROM sources")
+
+    def test_sample_only_and_without_a_tag(self):
+        db.init()
+        with db.connect() as conn:
+            conn.execute("INSERT INTO sources (provider, external_id, title, status) VALUES ('local', 'sun', 't', 'done')")
+            sid = conn.execute("SELECT id FROM sources WHERE external_id = 'sun'").fetchone()["id"]
+            for f, tags in (("a", ",city,"), ("b", ",city,sunset,"), ("c", None)):
+                conn.execute("INSERT INTO clips (source_id, file, duration, tags) VALUES (?, ?, 1, ?)", (sid, f"segments/{f}.mp4", tags))
+            files = lambda **k: sorted(r["file"] for r in db.sample_clips(conn, n=10, **k))
+            self.assertEqual(files(only="sunset"), ["segments/b.mp4"])
+            self.assertEqual(files(without=["sunset"]), ["segments/a.mp4", "segments/c.mp4"])   # untagged stays in
+            self.assertEqual(files(tags=["city"], without=["sunset"]), ["segments/a.mp4"])
+            self.assertEqual(files(tags=["city"], only="sunset"), ["segments/b.mp4"])
             conn.execute("DELETE FROM sources")
 
     def test_exclude_parsing_never_raises(self):
@@ -528,7 +571,11 @@ class ContemporaryTest(unittest.TestCase):
 
     def test_seed_sets(self):
         from corecore import seeds
-        self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "internet", "twitter", "beauty", "archival", "all"})
+        self.assertEqual(set(seeds.SEED_SETS), {"contemporary", "internet", "twitter", "beauty", "sunset", "archival", "all"})
+        # the sunset variation: tagged for its own export budget (sunset) and for CI's export filter (modern)
+        self.assertTrue(all({"sunset", "modern"} <= set(j["tags"]) for j in seeds.SUNSET_JOBS))
+        self.assertTrue(all(j in seeds.CONTEMPORARY_JOBS for j in seeds.SUNSET_JOBS))
+        self.assertFalse(any("sunset" in j["tags"] for j in seeds.CONTEMPORARY_JOBS if j not in seeds.SUNSET_JOBS))
         self.assertTrue(seeds.INTERNET_JOBS and all("modern" in j["tags"] and j["provider"] == "archive" for j in seeds.INTERNET_JOBS))
         self.assertTrue(all(j in seeds.CONTEMPORARY_JOBS for j in seeds.INTERNET_JOBS))   # weekly builds keep them in rotation
         self.assertTrue(all("beauty" in j["tags"] for j in seeds.BEAUTY_JOBS) and len(seeds.BEAUTY_JOBS) >= 10)

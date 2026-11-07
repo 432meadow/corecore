@@ -69,11 +69,12 @@ def _parse_ids(raw: str | None) -> list[int] | None:
 
 @app.get("/api/clips/sample")
 def clips_sample(n: int = Query(100, ge=1, le=500), tags: str | None = None, exclude: str | None = None,
-                 seed: int | None = None):
+                 seed: int | None = None, only: str | None = None, without: str | None = None):
     tag_list = [t for t in (tags or "").split(",") if t.strip()] or None
     excl = _parse_ids(exclude)
     with db.connect() as conn:
-        rows = db.sample_clips(conn, n=n, tags=tag_list, exclude=excl, seed=seed)
+        rows = db.sample_clips(conn, n=n, tags=tag_list, exclude=excl, seed=seed, only=(only or "").strip() or None,
+                               without=[t for t in (without or "").split(",") if t.strip()] or None)
         return {"clips": [db.clip_to_dict(r) for r in rows]}
 
 
@@ -167,7 +168,7 @@ def seed(set: str = "contemporary"):
     from .seeds import SEED_SETS
     jobs_list = SEED_SETS.get(set)
     if jobs_list is None:
-        raise HTTPException(400, f"unknown set {set!r}; use contemporary, archival or all")
+        raise HTTPException(400, f"unknown set {set!r}; use {', '.join(SEED_SETS)}")
     ids = [create_job(j["provider"], j.get("query"), j.get("url"), j.get("max_items", 5), j.get("tags")) for j in jobs_list]
     return {"queued": ids, "set": set}
 

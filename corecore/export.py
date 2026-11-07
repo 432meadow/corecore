@@ -49,10 +49,16 @@ def select_clips(rows: list, media_dir: Path, max_bytes: int, max_clips: int) ->
     return chosen, total
 
 
+# Clips scraped for the sunset variation carry this tag. They are published within a budget of their own, so the
+# variation has its footage without the sunsets crowding the main mix (which leans on nature easily enough).
+SUNSET = "sunset"
+
+
 def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 1024 * 1024, max_clips: int = 2000,
-                crf: int = 27, tags: list[str] | None = None, log=print) -> dict:
+                crf: int = 27, tags: list[str] | None = None, sunset_bytes: int = 150 * 1024 * 1024, log=print) -> dict:
     """`tags`: when given, only clips carrying at least one of these tags are exported (e.g. ["modern"] to
-    publish the contemporary set from a pool that also holds archival material)."""
+    publish the contemporary set from a pool that also holds archival material). `max_bytes` is the main mix's
+    budget; clips tagged sunset have `sunset_bytes` to themselves."""
     out = Path(out)
     for sub in ("clips", "thumbs", "web"):
         (out / sub).mkdir(parents=True, exist_ok=True)
@@ -95,42 +101,50 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
     finally:
         conn.close()
 
-    chosen, planned = select_clips(rows, config.MEDIA_DIR, max_bytes, max_clips)
-    log(f"exporting {len(chosen)} of {len(rows)} clips (~{planned // 2**20} MB) to {out}")
+    main = [r for r in rows if SUNSET not in db.tags_from_db(r["tags"])]
+    sun = [r for r in rows if SUNSET in db.tags_from_db(r["tags"])]
+    chosen, planned = select_clips(main, config.MEDIA_DIR, max_bytes, max_clips)
+    sun_chosen, sun_planned = select_clips(sun, config.MEDIA_DIR, sunset_bytes, max_clips)
+    log(f"exporting {len(chosen)} of {len(main)} clips (~{planned // 2**20} MB) and {len(sun_chosen)} of {len(sun)} "
+        f"sunset clips (~{sun_planned // 2**20} MB) to {out}")
     manifest_clips = []
     total = 0
     used_sources = set()
-    for r in chosen:
-        src = config.MEDIA_DIR / r["file"]
-        name = Path(r["file"]).name
-        dst = out / "clips" / name
-        try:
-            if height and r.get("height") and height < r["height"]:
-                ffmpeg.transcode(src, dst, height=height, crf=crf, has_audio=bool(r.get("has_audio")))
-            elif not dst.exists() or dst.stat().st_size != src.stat().st_size:
-                shutil.copy2(src, dst)
-        except (ffmpeg.FFmpegError, OSError) as e:
-            log(f"skip {name}: {e}")
-            continue
-        size = dst.stat().st_size
-        if total + size > max_bytes:
-            dst.unlink(missing_ok=True)
-            log("size budget reached")
-            break
-        total += size
-        thumb = None
-        if r.get("thumb") and (config.MEDIA_DIR / r["thumb"]).exists():
-            tname = Path(r["thumb"]).name
-            shutil.copy2(config.MEDIA_DIR / r["thumb"], out / "thumbs" / tname)
-            thumb = f"thumbs/{tname}"
-        used_sources.add(r["source_id"])
-        manifest_clips.append({
-            "id": r["id"], "source_id": r["source_id"], "file": f"clips/{name}", "thumb": thumb,
-            "duration": r["duration"], "width": r["width"], "height": r["height"], "has_audio": bool(r["has_audio"]),
-            "brightness": r["brightness"], "saturation": r["saturation"], "motion": r["motion"], "loudness": r["loudness"],
-            "faces": r.get("faces") or 0, "tags": db.tags_from_db(r["tags"]),
-            "start": round(r["start"], 2) if r.get("start") is not None else None,
-        })
+    budgets = [(chosen, max_bytes), (sun_chosen, sunset_bytes)]
+    for part, budget in budgets:
+        spent = 0
+        for r in part:
+            src = config.MEDIA_DIR / r["file"]
+            name = Path(r["file"]).name
+            dst = out / "clips" / name
+            try:
+                if height and r.get("height") and height < r["height"]:
+                    ffmpeg.transcode(src, dst, height=height, crf=crf, has_audio=bool(r.get("has_audio")))
+                elif not dst.exists() or dst.stat().st_size != src.stat().st_size:
+                    shutil.copy2(src, dst)
+            except (ffmpeg.FFmpegError, OSError) as e:
+                log(f"skip {name}: {e}")
+                continue
+            size = dst.stat().st_size
+            if spent + size > budget:
+                dst.unlink(missing_ok=True)
+                log("size budget reached")
+                break
+            spent += size
+            total += size
+            thumb = None
+            if r.get("thumb") and (config.MEDIA_DIR / r["thumb"]).exists():
+                tname = Path(r["thumb"]).name
+                shutil.copy2(config.MEDIA_DIR / r["thumb"], out / "thumbs" / tname)
+                thumb = f"thumbs/{tname}"
+            used_sources.add(r["source_id"])
+            manifest_clips.append({
+                "id": r["id"], "source_id": r["source_id"], "file": f"clips/{name}", "thumb": thumb,
+                "duration": r["duration"], "width": r["width"], "height": r["height"], "has_audio": bool(r["has_audio"]),
+                "brightness": r["brightness"], "saturation": r["saturation"], "motion": r["motion"], "loudness": r["loudness"],
+                "faces": r.get("faces") or 0, "tags": db.tags_from_db(r["tags"]),
+                "start": round(r["start"], 2) if r.get("start") is not None else None,
+            })
 
     manifest_sources = [{
         "id": s["id"], "key": f"{s['provider']}:{s['external_id']}", "title": s["title"], "uploader": s["uploader"],
@@ -146,6 +160,7 @@ def export_site(out: Path, *, height: int | None = None, max_bytes: int = 450 * 
         "bytes": total,
     }
     (out / "manifest.json").write_text(json.dumps(manifest, separators=(",", ":")), encoding="utf-8")
-    summary = {"clips": len(manifest_clips), "sources": len(manifest_sources), "bytes": total, "out": str(out)}
+    summary = {"clips": len(manifest_clips), "sources": len(manifest_sources), "bytes": total, "out": str(out),
+               "sunset_clips": sum(1 for c in manifest_clips if SUNSET in c["tags"])}
     log(f"done: {summary['clips']} clips from {summary['sources']} sources, {total // 2**20} MB")
     return summary

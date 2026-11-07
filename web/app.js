@@ -1,5 +1,5 @@
 import { AudioEngine } from './audio.js';
-import { Catalog, StaticCatalog } from './catalog.js';
+import { Catalog, StaticCatalog, SUNSET } from './catalog.js';
 import { Player } from './player.js';
 import { Recorder } from './recorder.js';
 import { MODES, Sequencer } from './sequencer.js';
@@ -26,6 +26,8 @@ const defaultAspect = () => (PHONE && UPRIGHT.matches ? '9:16' : '16:9');
 // the picture keeps more of itself, at 0.40
 const EDGE_DEFAULT = PHONE ? 0.4 : 0.5;
 const CLIPFX = { speaker: 'through computer speakers', phone: 'through a phone', direct: 'direct' };
+// what the stream is cut from: the main mix, or only the sunsets (scraped and published as a set of their own)
+const FOOTAGE = { all: 'everything', [SUNSET]: 'sunsets' };
 const PROVIDERS = { archive: 'internet archive', ytdlp: 'yt-dlp', dailymotion: 'dailymotion', reddit: 'reddit', stream: 'a stream', local: 'local files' };
 
 const state = {
@@ -38,6 +40,7 @@ const state = {
   aspect: !PHONE && ASPECTS.includes(params.get('aspect')) ? params.get('aspect') : defaultAspect(),
   aspectChosen: !PHONE && ASPECTS.includes(params.get('aspect')),
   tags: (params.get('tags') || '').split(',').map((t) => t.trim().toLowerCase()).filter(Boolean),
+  footage: params.get('footage') === SUNSET ? SUNSET : 'all',
   edge: params.has('edge') ? Math.max(0, Math.min(1, Number(params.get('edge')) || 0)) : EDGE_DEFAULT,
   clipfx: Object.keys(CLIPFX).includes(params.get('clipfx')) ? params.get('clipfx') : 'speaker',
   provider: 'archive',
@@ -45,7 +48,8 @@ const state = {
 };
 
 const audio = new AudioEngine();
-const catalog = STATIC ? new StaticCatalog({ seed: seedToInt(state.seed), manifestUrl: STATIC, tags: state.tags }) : new Catalog({ seed: seedToInt(state.seed), tags: state.tags });
+const pick = { seed: seedToInt(state.seed), tags: state.tags, footage: state.footage };
+const catalog = STATIC ? new StaticCatalog({ ...pick, manifestUrl: STATIC }) : new Catalog(pick);
 const sequencer = new Sequencer({ catalog, seed: state.seed, mode: state.mode });
 const canvas = $('#stage');
 const player = new Player({ canvas, audio, catalog, sequencer, videoHost: $('#videos') });
@@ -112,6 +116,7 @@ function status(msg, ms = 2400) {
 }
 function drawStatus() {
   const f = [MODES[state.mode].label.toLowerCase().replace(/\s*\(.*?\)/g, ''), state.live ? 'the live channel' : `seed ${state.seed}`];
+  if (state.footage === SUNSET) f.push(catalog.footageEmpty ? 'no sunsets yet, so everything' : 'sunsets');
   if (state.tags.length) f.push(`only ${state.tags.join(', ')}`);
   if (!state.started) f.push('waiting');
   else if (player.paused) f.push('paused');
@@ -142,6 +147,7 @@ function setTheme(t) {
 
 function syncUrl() {
   const p = new URLSearchParams({ seed: state.live ? 'live' : state.seed, mode: state.mode });
+  if (state.footage !== 'all') p.set('footage', state.footage);
   if (state.tags.length) p.set('tags', state.tags.join(','));
   if (state.edge !== EDGE_DEFAULT) p.set('edge', String(state.edge));
   if (state.clipfx !== 'speaker') p.set('clipfx', state.clipfx);
@@ -169,6 +175,18 @@ function setMode(name) {
   status('', 0);
 }
 
+// Under the silence between two streams: the next one is made from the state as it is at that moment, all of
+// it, since a second switch made during the fade (a seed, then the footage) replaces the first one's swap.
+function swapStream() {
+  const footage = catalog.footage !== state.footage;
+  if (footage) catalog.setFootage(state.footage);
+  catalog.seed = seedToInt(state.seed);
+  sequencer.reseed(state.seed);
+  player.snapEnabled = !state.live;
+  if (state.started) applyMusic();
+  if (footage) refreshStats().then(drawStatus);   // the status line says if there are no sunsets yet
+}
+
 function setSeed(seed, { live = false } = {}) {
   state.live = live;
   state.seed = seed;
@@ -178,17 +196,21 @@ function setSeed(seed, { live = false } = {}) {
   status(live ? 'everyone sees this edit right now' : 'a new stream', 2400);
   // the old stream fades out; under the second of silence that follows, the new one is seeded and its desk
   // started, then it fades in
-  const swap = () => {
-    sequencer.reseed(seed);
-    catalog.seed = seedToInt(seed);
-    player.snapEnabled = !live;
-    if (state.started) applyMusic();
-  };
-  if (!state.started) { swap(); return; }
-  player.transition({ fastForward: live ? liveElapsed : 0, swap });
+  if (!state.started) { swapStream(); return; }
+  player.transition({ fastForward: live ? liveElapsed : 0, swap: swapStream });
 }
 
 function goLive() { setSeed(liveSeed(), { live: true }); }
+
+// Another footage is another stream: the old one fades out, and under the silence the pool is swapped and the
+// stream starts over from its seed (so a link, or the live channel, gives everyone the same edit of it).
+function setFootage(v) {
+  state.footage = v;
+  light($('#footage'), v);
+  syncUrl();
+  if (!state.started) swapStream();
+  else player.transition({ fastForward: state.live ? liveElapsed : 0, swap: swapStream });
+}
 
 function checkLive() {
   if (state.live && state.started && liveSeed() !== state.seed) setSeed(liveSeed(), { live: true });
@@ -382,6 +404,7 @@ function wire() {
 
   seg($('#modes'), Object.entries(MODES).map(([k, m]) => [k, m.label.toLowerCase().replace(/\s*\(.*?\)/g, '')]), state.mode, setMode, 'the mode');
   $('#modeBlurb').textContent = MODES[state.mode].blurb;
+  seg($('#footage'), Object.entries(FOOTAGE), state.footage, setFootage, 'the footage');
   seg($('#aspects'), ASPECTS.map((a) => [a, a]), state.aspect, setAspect, 'the frame');
   seg($('#clipfxs'), Object.entries(CLIPFX), state.clipfx, setClipFx, 'the clip sound');
   seg($('#providers'), Object.entries(PROVIDERS), state.provider, (v) => { state.provider = v; light($('#providers'), v); }, 'the source');

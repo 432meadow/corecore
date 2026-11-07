@@ -25,12 +25,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--tags", "-t", default="", help="comma-separated tags, e.g. nature,archive")
 
     p = sub.add_parser("seed", help="queue a starter set of scrape jobs")
-    p.add_argument("--set", default="contemporary", choices=["contemporary", "internet", "twitter", "beauty", "archival", "all"], dest="seed_set")
+    p.add_argument("--set", default="contemporary", choices=["contemporary", "internet", "twitter", "beauty", "sunset", "archival", "all"], dest="seed_set")
 
     p = sub.add_parser("export", help="write the player + a bounded slice of the pool as a static site")
     p.add_argument("--out", default="site")
     p.add_argument("--height", type=int, default=None, help="re-encode clips taller than this (default: copy as is)")
     p.add_argument("--max-mb", type=float, default=450, dest="max_mb")
+    p.add_argument("--sunset-mb", type=float, default=150, dest="sunset_mb", help="the sunset variation's own budget")
     p.add_argument("--max-clips", type=int, default=2000, dest="max_clips")
     p.add_argument("--tags", default="", help="export only clips with at least one of these comma-separated tags")
 
@@ -39,9 +40,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--time-budget", type=float, default=1500, dest="time_budget", help="seconds of scraping before export")
     p.add_argument("--height", type=int, default=None)
     p.add_argument("--max-mb", type=float, default=450, dest="max_mb")
+    p.add_argument("--sunset-mb", type=float, default=150, dest="sunset_mb", help="the sunset variation's own budget")
     p.add_argument("--max-clips", type=int, default=2000, dest="max_clips")
     p.add_argument("--skip-ingest", action="store_true", dest="skip_ingest")
-    p.add_argument("--set", default="contemporary", choices=["contemporary", "internet", "twitter", "beauty", "archival", "all"], dest="seed_set")
+    p.add_argument("--set", default="contemporary", choices=["contemporary", "internet", "twitter", "beauty", "sunset", "archival", "all"], dest="seed_set")
     p.add_argument("--tags", default="", help="export only clips with at least one of these comma-separated tags")
     p.add_argument("--min-clips", type=int, default=0, dest="min_clips",
                    help="if the pool holds fewer clips than this, scrape for --fallback-budget seconds even when --time-budget is 0")
@@ -119,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
             from .audit import audit
             print(f"audit: {audit(log=lambda m: print(f'  {m}'))}")
         result = export_site(args.out, height=args.height, max_bytes=int(args.max_mb * 1024 * 1024), max_clips=args.max_clips,
+                             sunset_bytes=int(args.sunset_mb * 1024 * 1024),
                              tags=[t for t in args.tags.split(",") if t.strip()] or None)
         print(result)
         return 0

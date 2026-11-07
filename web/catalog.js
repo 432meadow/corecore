@@ -1,10 +1,18 @@
 // The client-side clip pool: a sampled window onto the server's catalogue, with feature-aware picking.
 // StaticCatalog (below) is the same thing fed by an exported manifest.json, for static hosting.
 import { makeRng } from './prng.js';
+
+// The footage the stream draws on: 'all', the main mix, or 'sunset', the clips scraped for the sunset
+// variation (tagged sunset, published within a budget of their own). The main mix leaves them out.
+export const SUNSET = 'sunset';
+export const FOOTAGE = ['all', SUNSET];
+
 export class Catalog {
-  constructor({ seed = null, tags = [] } = {}) {
+  constructor({ seed = null, tags = [], footage = 'all' } = {}) {
     this.seed = seed;
     this.tags = tags;          // when set, only clips carrying one of these tags are played
+    this.footage = footage;
+    this.sunsets = null;       // how many sunset clips the pool holds, once known
     this.pool = [];
     this.recent = [];
     this.bad = new Set();
@@ -15,15 +23,27 @@ export class Catalog {
 
   get size() { return this.pool.length; }
 
+  // sunsets asked for and none in the pool: the main mix plays meanwhile
+  get footageEmpty() { return this.footage === SUNSET && this.sunsets === 0; }
+
   async refreshStats() {
     const r = await fetch('api/stats');
     this.stats = await r.json();
-    if (this.tags.length) {   // restrict the sequencer's view of the pool to the chosen tags
-      const r2 = await fetch(`api/clips/sample?n=500&tags=${encodeURIComponent(this.tags.join(','))}`);
+    this.sunsets = this.stats.tags?.[SUNSET] || 0;
+    if (this.tags.length || this.sunsets) {   // restrict the sequencer's view of the pool to what plays
+      const r2 = await fetch(`api/clips/sample?${this.filterParams(new URLSearchParams({ n: '500' }))}`);
       const j = await r2.json();
       this.stats = Object.assign({}, this.stats, computeStats(j.clips || []));
     }
     return this.stats;
+  }
+
+  // the chosen tags (any of them) and the footage (the sunsets alone, or the main mix without them)
+  filterParams(params) {
+    if (this.tags.length) params.set('tags', this.tags.join(','));
+    if (this.footage === SUNSET && !this.footageEmpty) params.set('only', SUNSET);
+    else params.set('without', SUNSET);
+    return params;
   }
 
   setTags(tags) {
@@ -31,6 +51,11 @@ export class Catalog {
     this.pool = [];
     this.recent = [];
     this.generation = 0;
+  }
+
+  setFootage(footage) {
+    this.footage = FOOTAGE.includes(footage) ? footage : 'all';
+    this.setTags(this.tags);
   }
 
   // Refill from the server. Recently played clips are excluded first; if that leaves too little
@@ -67,7 +92,7 @@ export class Catalog {
   async fetchInto(n, exclude) {
     const params = new URLSearchParams({ n: String(n), exclude: exclude.join(',') });
     if (this.seed != null) params.set('seed', String((this.seed + this.generation++) >>> 0));
-    if (this.tags.length) params.set('tags', this.tags.join(','));
+    this.filterParams(params);
     const r = await fetch(`api/clips/sample?${params}`);
     if (!r.ok) throw new Error(`sample failed: ${r.status}`);
     const j = await r.json();
@@ -152,8 +177,8 @@ export function computeStats(clips) {
 // Static edition: the whole pool is in memory, picks are deterministic for a given seed and sequence of
 // calls (no timing-dependent refills), which is what makes the synchronized live channel possible.
 export class StaticCatalog extends Catalog {
-  constructor({ seed = null, manifestUrl = 'manifest.json', tags = [] } = {}) {
-    super({ seed, tags });
+  constructor({ seed = null, manifestUrl = 'manifest.json', tags = [], footage = 'all' } = {}) {
+    super({ seed, tags, footage });
     this.manifestUrl = manifestUrl;
     this.all = null;
     this.everything = null;
@@ -167,14 +192,20 @@ export class StaticCatalog extends Catalog {
     if (this.everything) { this.all = this.filtered(); this.recomputeStats(); }
   }
 
+  // The footage first: the sunsets alone, or the main mix without them (until sunsets are published, the
+  // main mix, and footageEmpty says so). Then the chosen tags within it, if any clip there carries one.
   filtered() {
-    if (!this.tags.length) return this.everything;
+    const sun = this.everything.filter((c) => c.tags.includes(SUNSET));
+    const main = this.everything.filter((c) => !c.tags.includes(SUNSET));
+    this.sunsets = sun.length;
+    const base = this.footage === SUNSET && sun.length ? sun : (main.length ? main : this.everything);
+    if (!this.tags.length) return base;
     const want = new Set(this.tags);
-    const subset = this.everything.filter((c) => c.tags.some((t) => want.has(t)));
-    return subset.length ? subset : this.everything;
+    const subset = base.filter((c) => c.tags.some((t) => want.has(t)));
+    return subset.length ? subset : base;
   }
 
-  get size() { return this.all ? this.all.length - this.bad.size : 0; }
+  get size() { return this.all ? this.all.reduce((n, c) => n + (this.bad.has(c.id) ? 0 : 1), 0) : 0; }
 
   async load() {
     if (this.all) return this.all;

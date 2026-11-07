@@ -48,7 +48,7 @@ sound, which surfaces now and then as if heard through a small speaker across th
 | | full app | static edition (GitHub Pages) |
 | --- | --- | --- |
 | runs | `python -m corecore serve` on your machine | any static host; CI builds it |
-| footage | whatever you scrape or drop in, unlimited | a bounded slice of the pool (default 450 MB) exported with `python -m corecore export` |
+| footage | whatever you scrape or drop in, unlimited | a bounded slice of the pool (default 450 MB, and 150 MB of sunsets) exported with `python -m corecore export` |
 | scraping | from the browser or the CLI, any provider | done by the GitHub Actions workflow from the Internet Archive, cached between runs so the pool grows |
 | sound | the desk, synthesized in the browser | the same |
 | curation | ban clips for everyone | ban clips for yourself (localStorage) |
@@ -56,7 +56,7 @@ sound, which surfaces now and then as if heard through a small speaker across th
 The static edition is the same player: `index.html` just carries `window.CORECORE_STATIC = "manifest.json"`
 and the catalogue reads the manifest instead of the API. `.github/workflows/pages.yml` does the rest:
 scrape within a time budget, clip, export, deploy. Trigger it by hand from the Actions tab (inputs: time
-budget and size budget), or let the Monday schedule run.
+budget, size budget, the sunsets' size budget, set, pages), or let the Monday schedule run.
 
 ## How it works
 
@@ -148,9 +148,16 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 | v | cycle 16:9, 9:16, 1:1, 2.39:1 |
 | x | ban the current clip (removed from the pool for good) |
 
-The URL carries `seed`, `mode`, `tags`, `edge` and `clipfx`, so a link reproduces a stream over the same
+The URL carries `seed`, `mode`, `footage`, `tags`, `edge` and `clipfx`, so a link reproduces a stream over the same
 pool; `[ share this stream ]` in the controls copies it. The frame belongs to the screen: a phone always opens
 in its own (9:16 held upright) and a link never carries one; on a computer `?aspect=` typed in sets it.
+
+**Sunsets.** `[ everything ]  [ sunsets ]`, under the modes, picks the footage the stream is cut from. The
+sunsets are a set of their own (`--set sunset`), scraped from the same mirrors and tagged `sunset`, and the
+export gives them a budget of their own (`--sunset-mb`, 150 MB in CI) on top of the main mix's, which leaves
+them out, so everything stays as it was. Another footage is another stream, with the same fade as a new seed,
+and the address carries it (`?footage=sunset`), so a link or the live channel gives everyone the same edit.
+Until sunsets are published the stream plays everything, and the status line says so.
 
 **Between streams.** A new seed (or the live channel) does not cut: the picture fades out to the page over
 half a second and the sound with it, a full second of silence on the empty page, then the new stream fades
@@ -194,7 +201,8 @@ by middle dots. There are no toasts, spinners or sounds from the interface, and 
 
 ## Sources
 
-Three starter sets, one switch (`--set contemporary|beauty|archival|all`, or the buttons in the controls):
+Starter sets, one switch (`--set contemporary|internet|twitter|beauty|sunset|archival|all`; the buttons in the
+controls queue the contemporary, beauty and archival ones):
 
 - **beauty** (also inside the contemporary set, early in the list): kindness and subtle natural
   poignance, from corners of the archive where the footage is what its title says. The park service's
@@ -213,6 +221,12 @@ Three starter sets, one switch (`--set contemporary|beauty|archival|all`, or the
   ASMR. The queries use quoted phrases (the archive's search treats `dash cam` as dash OR cam), newest-first
   ordering (`|sort=date desc` on any archive query) and a title blocklist (`CORECORE_BLOCKLIST`) that drops
   adult and gore uploads, which otherwise dominate the popular end of that collection.
+- **internet** (inside the contemporary set too): its social half, for runs that want more of it: the
+  TikTok, Twitter and Periscope mirrors, vlogs, phone clips, CCTV, weird happenings. **twitter** is its
+  Twitter and Periscope part.
+- **sunset** (inside the contemporary set too): the footage of `[ sunsets ]`, suns going down over sea,
+  fields and cities, golden hour, dusk skies, filmed by people. Tagged `sunset`, so the export publishes it
+  within its own budget and the main mix leaves it out.
 - **archival**: the Prelinger ephemeral films, NASA and other public-domain footage. Legally the cleanest
   pool. The public GitHub Pages build scrapes the contemporary set and exports only clips tagged `modern`;
   its `seed_set` workflow input switches it.
@@ -279,7 +293,7 @@ Environment variables, all optional:
 | method and path | what |
 | --- | --- |
 | `GET /api/stats` | clip, source and tag counts |
-| `GET /api/clips/sample?n=&seed=&tags=&exclude=` | random window of playable clips (seeded order) |
+| `GET /api/clips/sample?n=&seed=&tags=&only=&without=&exclude=` | random window of playable clips (seeded order); `tags` any of, `only` this one too, `without` none of |
 | `GET /api/clips?offset=&limit=&tag=` | browse newest first |
 | `POST /api/clips/{id}/ban` (`?undo=1`) | remove from / restore to the pool |
 | `GET /api/sources` | ingested sources with status, license and clip counts |
