@@ -141,7 +141,7 @@ browser: catalog.js ──► sequencer.js (phrases + modes) ──► player.js
 | n | skip to the next phrase |
 | . | skip this cut |
 | h | show / hide the controls |
-| i | debug overlay (phrase, clip, tags, queue, onsets) |
+| i | info: what the stream is doing (mode, phrase, clip, tags, queue), in small type under the picture |
 | f | fullscreen |
 | r | start / stop recording (downloads a WebM of what you saw and heard) |
 | s | new seed |

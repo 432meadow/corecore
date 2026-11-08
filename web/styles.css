@@ -35,6 +35,11 @@ a:focus-visible { outline: 1px solid var(--focus); outline-offset: 4px; }
 #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; object-fit: contain; background: var(--field); display: block; transition: background 0.7s ease; cursor: pointer; }
 #videos { position: fixed; left: -9999px; top: 0; width: 2px; height: 2px; opacity: 0.01; pointer-events: none; overflow: hidden; }
 #videos video { width: 2px; height: 2px; }
+/* [ info ]: what the stream is doing, a few lines of small words centred under the picture, in the page's colours */
+#infoPane { position: fixed; z-index: 5; transform: translateX(-50%); pointer-events: none; text-align: center;
+            font-size: 11px; line-height: 1.6; color: var(--s2); font-variant-numeric: tabular-nums; transition: color 0.7s ease;
+            text-shadow: 0 0 3px var(--bg), 0 0 8px var(--bg); }   /* a halo of the page, where there is no room below the picture */
+#infoPane div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* the door */
 #splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); z-index: 20; cursor: pointer; padding: 16px; transition: background 0.7s ease, color 0.7s ease; }

@@ -60,13 +60,17 @@ function waitSeek(el, timeout) {
 }
 
 export class Player {
-  constructor({ canvas, audio, catalog, sequencer, videoHost }) {
+  constructor({ canvas, audio, catalog, sequencer, videoHost, infoHost }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.audio = audio;
     this.catalog = catalog;
     this.sequencer = sequencer;
     this.videoHost = videoHost || document.body;
+    this.infoHost = infoHost || null;   // [ info ]: a few lines of words under the picture
+    this.infoAt = 0;
+    // the words follow the picture when the window, the frame or the edge changes, playing or paused
+    if (this.infoHost) addEventListener('resize', () => { if (this.showInfo) this.placeInfo(); });
     this.queue = [];
     this.current = null;
     this.previous = null;
@@ -110,6 +114,7 @@ export class Player {
 
   setEdge(e) {
     this.edge = Math.max(0, Math.min(1, e));
+    if (this.showInfo && this.infoHost) this.placeInfo();
   }
 
   // The field: 'dark' is a black screen, 'light' an off-white page the picture sits on like a print.
@@ -226,6 +231,7 @@ export class Player {
     this.canvas.width = w;
     this.canvas.height = h;
     this.buildOverlays();
+    if (this.showInfo && this.infoHost) this.placeInfo();
   }
 
   buildOverlays() {
@@ -906,7 +912,7 @@ export class Player {
       ctx.fillRect(0, 0, W, H);
       ctx.restore();
     }
-    if (this.showInfo) this.drawInfo(c);
+    if (this.showInfo) this.updateInfo(c);
   }
 
   drawText(c, now) {
@@ -947,25 +953,56 @@ export class Player {
     return lines;
   }
 
-  drawInfo(c) {
-    const ctx = this.ctx;
-    const lines = [
-      `mode ${this.sequencer.mode}  seed ${this.sequencer.seed}  cycle ${this.sequencer.cycleCount}`,
-      `phrase ${c?.phrase || '-'}  dur ${c ? c.dur.toFixed(2) : '-'}s  speed ${c?.speed ? c.speed.toFixed(2) : '-'}  snap ${c?.snap ? 'y' : 'n'}`,
-      c?.clip ? `clip #${c.clip.id}  ${c.clip.source_title || ''}  (${c.clip.provider || ''})` : 'no clip',
-      c?.clip ? `tags ${c.clip.tags.join(' ')}` : '',
-      c?.clip ? `b ${c.clip.brightness ?? '-'} s ${c.clip.saturation ?? '-'} m ${c.clip.motion ?? '-'}` : '',
-      `queue ${this.queue.length}  pool ${this.catalog.size}  cues ${this.stats.cues}  snaps ${this.stats.snaps}  fails ${this.stats.failures}` + (this.origin != null && c?.at != null ? `  drift ${(this.audio.now() - this.origin - c.at - (this.audio.now() - c.start)).toFixed(2)}s` : ''),
-      `theme ${this.sequencer.theme ? this.sequencer.theme.join(' / ') : 'none'}  music ${this.audio.mode}  level ${this.audio.level.toFixed(2)}`,
-    ];
-    ctx.save();
-    ctx.font = '13px ui-monospace, Menlo, monospace';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(8, 8, 620, 18 * lines.length + 10);
-    ctx.fillStyle = '#9f9';
-    lines.forEach((l, i) => ctx.fillText(l, 14, 14 + i * 18));
-    ctx.restore();
+  // [ info ]: what the stream is doing, in small words centred under the picture. They are the page's, not the
+  // picture's, so a recording never carries them, and they take the page's colours.
+  setInfo(on) {
+    this.showInfo = on;
+    if (!this.infoHost) return;
+    this.infoHost.classList.toggle('hidden', !on);
+    if (on) this.updateInfo(this.current, true);
+  }
+
+  updateInfo(c, force = false) {
+    const host = this.infoHost;
+    if (!host) return;
+    const t = performance.now();
+    if (!force && t - this.infoAt < 200) return;   // a few times a second is enough to read
+    this.infoAt = t;
+    const lines = this.infoLines(c);
+    while (host.children.length < lines.length) host.appendChild(document.createElement('div'));
+    lines.forEach((l, i) => { if (host.children[i].textContent !== l) host.children[i].textContent = l; });
+    this.placeInfo();
+  }
+
+  infoLines(c) {
+    const s = this.sequencer, clip = c?.kind === 'clip' ? c.clip : null;
+    const n = (v) => (v == null || !Number.isFinite(Number(v)) ? '-' : Number(v).toFixed(2));
+    const now = this.audio.now();
+    const drift = this.origin != null && c?.at != null ? now - this.origin - c.at - (now - c.start) : null;
+    return [
+      [s.mode, `seed ${s.seed}`, `cycle ${s.cycleCount}`, c?.phrase, c ? `${n(c.dur)} s` : null,
+        c?.speed ? `speed ${n(c.speed)}` : null, c?.snap ? 'snap' : null],
+      clip ? [`clip ${clip.id}`, clip.source_title, clip.provider,
+        `brightness ${n(clip.brightness)}`, `saturation ${n(clip.saturation)}`, `motion ${n(clip.motion)}`, (clip.tags || []).join(' ')]
+        : [c ? c.kind : 'nothing playing'],
+      [`queue ${this.queue.length}`, `pool ${this.catalog.size}`, `cues ${this.stats.cues}`, `snaps ${this.stats.snaps}`,
+        `fails ${this.stats.failures}`, drift != null ? `drift ${n(drift)} s` : null,
+        `theme ${s.theme ? s.theme.join(' / ') : 'none'}`, `music ${this.audio.mode}`, `level ${n(this.audio.level)}`],
+    ].map((parts) => parts.filter((x) => x != null && x !== '').join(' · '));
+  }
+
+  // Under the picture, centred on it: the canvas is fitted into its box (object-fit: contain) and the picture sits
+  // inside the canvas, smaller when framed. Where there is no room below it, the words keep to the window's foot.
+  placeInfo() {
+    const host = this.infoHost, W = this.canvas.width, H = this.canvas.height;
+    const box = this.canvas.getBoundingClientRect();
+    const k = Math.min(box.width / W, box.height / H);
+    const r = this.pictureRect({ kind: 'clip' });
+    const x = box.left + (box.width - W * k) / 2 + (r.x + r.w / 2) * k;
+    const y = box.top + (box.height - H * k) / 2 + (r.y + r.h) * k;
+    host.style.left = `${Math.round(x)}px`;
+    host.style.maxWidth = `${Math.round(Math.max(260, r.w * k))}px`;
+    host.style.top = `${Math.round(Math.max(0, Math.min(y + 10, window.innerHeight - host.offsetHeight - 8)))}px`;
   }
 
   // --- controls ------------------------------------------------------------------------------
